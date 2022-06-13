@@ -1,0 +1,12 @@
+name: porous_flow_env
+channels:
+    - defaults
+dependencies:
+    - python>=3.10
+    - numpy
+    - scipy
+    - conda-forge::fipy
+    - cantera::cantera
+    - pip
+    - pip:
+        - git+https://github.com/ZBT-Tools/pemfc-core.git@master#egg=pemfc

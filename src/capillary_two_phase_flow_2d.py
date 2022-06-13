@@ -13,6 +13,9 @@ from fipy.tools import numerix
 from fipy import input
 import saturation as sat
 import matplotlib
+from pemfc.src import fluid
+from pemfc.src import di
+from fluids import fluid_dict
 matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
@@ -20,6 +23,12 @@ matplotlib.use('TkAgg')
 current_density = 30000.0
 temp_bc = 343.15
 operating_voltage = 0.5
+
+# Humidity in channel
+h_chl = 1.0
+
+# Fraction of inlet oxygen concentration
+f_O2 = 0.75
 
 # Saturation at channel gdl interace
 s_chl = 0.001
@@ -86,6 +95,16 @@ elif saturation_model == 'psd':
 else:
     raise NotImplementedError
 
+# Create fluid object
+fluid_dict['nodes'] = mesh.numberOfCells
+fluid_dict['temperature'] = temp_bc
+fluid_dict['pressure'] = p_gas
+fluid_dict['humidity'] = h_chl
+fluid_dict['components']['O2'] = fluid_dict['components']['O2'] * f_O2
+fluid_dict['components']['N2'] = 1.0 - fluid_dict['components']['O2']
+humid_air = fluid.factory(fluid_dict, backend='pemfc')
+humid_air.update()
+
 # Constant factor for saturation "diffusion" coefficient
 D_s_const = rho_water / mu_water * permeability_abs
 
@@ -94,9 +113,10 @@ D_s_const = rho_water / mu_water * permeability_abs
 D_s = CellVariable(mesh=mesh, value=D_s_const)
 D_s_f = FaceVariable(mesh=mesh, value=D_s.arithmeticFaceValue())
 
-D_c = CellVariable(mesh=mesh, value=[[X**2 * 1000, 0],
-                                     [0, -Y**2 * 1000]])
+# Concentration diffusion coefficient
+D_c = CellVariable(mesh=mesh, value=humid_air.)
 
+# Thermal diffusion coefficient (conductivity)
 K_th = CellVariable(mesh=mesh, value=thermal_conductivity)
 
 # D_c = CellVariable(mesh=mesh, value=0.0)
@@ -114,20 +134,15 @@ s = CellVariable(mesh=mesh, value=0.0, hasOld=True)
 temp = CellVariable(mesh=mesh, value=temp_bc)
 
 # Species concentration, last species will not be solved for
-species_fractions = \
-    [{'name': 'O2', 'value': 0.21},
-     {'name': 'H2O', 'value': 0.0},
-     {'name': 'N2', 'value': 0.79}]
-
-x = [CellVariable(name='x_' + species_fractions[i]['name'],
+c = [CellVariable(name='c_' + humid_air.species_names[i],
                   mesh=mesh,
-                  value=species_fractions[i]['value'])
-     for i, species in enumerate(species_fractions)]
+                  value=humid_air.concentration[i])
+     for i in range(len(humid_air.n_species))]
 
-c = [CellVariable(name='c_' + species_fractions[i]['name'],
-                  mesh=mesh,
-                  value=species_fractions[i]['value'])
-     for i, species in enumerate(species_fractions)]
+# c = [CellVariable(name='c_' + humid_air.species_names[i],
+#                   mesh=mesh,
+#                   value=humid_air.concentration[i])
+#      for i in range(len(humid_air.n_species))]
 
 # Set boundary conditions
 # top: fixed Dirichlet condition (fixed liquid pressure according to saturation
@@ -165,6 +180,13 @@ K_th.constrain(0.0, facesBottom)
 eq_t = DiffusionTerm(K_th) \
        - (facesBottom * heat_flux).divergence
 
+# Boundary conditions for molar fractions
+c_bc = [humid_air.concentration[i][0] for i in range(humid_air.n_species)]
+for i in range(len(c)):
+    c[i].constrain(c_bc[i], facesTopRight)
+
+
+
 # We can solve the steady-state problem
 iter_max = 1000
 iter_min = 10
@@ -177,18 +199,18 @@ p_cap = np.ones(s_value.shape) * 1000.0
 p_cap_old = np.copy(p_cap)
 residual = np.inf
 
-iter = 0
+iter_count = 0
 
 residuals = []
 
 while True:
-    if iter > iter_min and residual <= error_tol:
+    if iter_count > iter_min and residual <= error_tol:
         print('Solution converged with {} steps and residual = {}'.format(
-            iter, residual))
+            iter_count, residual))
         break
-    if iter >= iter_max:
+    if iter_count >= iter_max:
         print('Solution did not converge within {} steps and residual = {}'
-              ''.format(iter, residual))
+              ''.format(iter_count, residual))
         break
 
     # update diffusion values with previous saturation values
@@ -198,7 +220,7 @@ while True:
     # p_liq.faceGrad.constrain(water_flux, facesBottom)
 
     # solve liquid pressure transport equation
-    residual_s = eq_s.sweep(var=p_liq) #, underRelaxation=urfs[i])
+    residual_s = eq_s.sweep(var=p_liq)  # , underRelaxation=urfs[i])
     residual_t = eq_t.sweep(var=temp)
 
     p_cap_old = np.copy(p_cap)
@@ -220,14 +242,14 @@ while True:
     residual = residual_t + residual_s  # + eps
     # update iteration counter
     residuals.append(residual)
-    iter += 1
+    iter_count += 1
 
 if __name__ == '__main__':
-    viewer = Viewer(vars=s) #, datamin=0., datamax=1.)
+    viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
     viewer.plot()
     input("Saturation. Press <return> to proceed...")
 
-    viewer = Viewer(vars=temp) #, datamin=0., datamax=1.)
+    viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
     viewer.plot()
     input("Temperature. Press <return> to proceed...")
 
