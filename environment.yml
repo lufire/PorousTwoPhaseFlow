@@ -9,4 +9,4 @@ dependencies:
     - cantera::cantera
     - pip
     - pip:
-        - git+https://github.com/ZBT-Tools/pemfc-core.git@master#egg=pemfc
+        - git+https://github.com/ZBT-Tools/pemfc-core.git@fluid_extension#egg=pemfc

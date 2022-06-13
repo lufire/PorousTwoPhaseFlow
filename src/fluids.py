@@ -20,3 +20,7 @@ fluid_dict = \
         "pressure": 101325.0,
         "nodes": (10, 5)
     }
+
+
+def calc_surface_tension(temperature):
+    return 0.07275 * (1.0 - 0.002 * (temperature - 291.0))
