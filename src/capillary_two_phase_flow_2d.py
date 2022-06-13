@@ -14,7 +14,6 @@ from fipy import input
 import saturation as sat
 import matplotlib
 from pemfc.src import fluid
-from pemfc.src import di
 from fluids import fluid_dict
 matplotlib.use('TkAgg')
 
