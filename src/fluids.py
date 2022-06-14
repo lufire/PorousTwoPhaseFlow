@@ -15,8 +15,12 @@ fluid_dict = \
                 "molar_fraction": 0.0
             }
         },
-        "humidity": 1.0,
+        "humidity": 0.5,
         "temperature": 343.15,
         "pressure": 101325.0,
         "nodes": (10, 5)
     }
+
+
+def calc_surface_tension(temperature):
+    return 0.07275 * (1.0 - 0.002 * (temperature - 291.0))
