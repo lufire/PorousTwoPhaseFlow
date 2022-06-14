@@ -3,7 +3,7 @@ import sys
 import subprocess
 
 # Specify dimensions ('1d', '2d')
-dimensions = '1d'
+dimensions = '2d'
 
 if __name__ == '__main__':
     file_name = 'src/capillary_two_phase_flow_' + dimensions + '.py'

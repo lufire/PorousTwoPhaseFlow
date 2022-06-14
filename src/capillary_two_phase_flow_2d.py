@@ -13,6 +13,9 @@ from fipy.tools import numerix
 from fipy import input
 import saturation as sat
 import matplotlib
+
+import pemfc.src.fluid as fluid
+from fluids import fluid_dict
 matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
@@ -77,6 +80,13 @@ L = dx * nx
 W = dy * ny
 mesh = Grid2D(dx=dx, dy=dy, nx=nx, ny=ny)
 X, Y = mesh.faceCenters
+
+# Create fluid objects
+fluid_dict['nodes'] = mesh.numberOfCells
+fluid_dict['temperature'] = temp_bc
+fluid_dict['pressure'] = p_gas
+
+humid_air = fluid.factory(fluid_dict, backend='pemfc')
 
 # Select parameter set according to saturation model
 if saturation_model == 'leverett':
@@ -183,7 +193,7 @@ residuals = []
 
 while True:
     if iter > iter_min and residual <= error_tol:
-        print('Solution converged with {} steps and residual = {}'.format(
+        print('Solution converged within {} steps and residual = {}'.format(
             iter, residual))
         break
     if iter >= iter_max:
@@ -194,7 +204,7 @@ while True:
     # update diffusion values with previous saturation values
     D_s.setValue(D_s_const * sat.k_s(s))
     D_s_f.setValue(D_s.arithmeticFaceValue())
-
+    humid_air.update(temperature=temp_bc, pressure=p_gas)
     # p_liq.faceGrad.constrain(water_flux, facesBottom)
 
     # solve liquid pressure transport equation
