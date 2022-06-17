@@ -17,71 +17,59 @@ import pemfc
 from pemfc import constants
 from pemfc.src.fluid import fluid
 from pemfc.src.fluid import diffusion_model
-import fluids
-from fluids import fluid_dict
+import saturation_model as sm
+import settings
+from parameters import fluid_dict, porous_dict, electrode_dict, \
+    saturation_model_dict
 matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
 # Operating conditions
-current_density = 10000.0
-temp_bc = 343.15
-operating_voltage = 0.8
+current_density = settings.boundary_conditions['current_density']
+temp_bc = settings.boundary_conditions['channel_temperature']
+operating_voltage = settings.boundary_conditions['operating_voltage']
 
 # Humidity in channel
-h_chl = 0.0
+h_chl = settings.boundary_conditions['channel_humidity']
 # Fraction of inlet oxygen concentration
 # (at simulated position along the channel)
-f_O2 = 0.75
+f_O2 = settings.boundary_conditions['oxygen_fraction']
 # Saturation at channel gdl interace
-s_chl = 0.001
+s_chl = settings.boundary_conditions['gdl_channel_saturation']
 # Constant gas pressure
-p_gas = 101325.0
+p_gas = settings.boundary_conditions['channel_pressure']
 # Liquid fraction (molar) of produced water at CL-GDL interface
-liquid_water_fraction_cl = 1.0
+liquid_water_fraction_cl = \
+    settings.boundary_conditions['cl_gdl_liquid_water_fraction']
 
 # Physical parameters
-thermo_neutral_voltage = 1.482
+thermo_neutral_voltage = electrode_dict["thermoneutral_voltage"]
 faraday = constants.FARADAY
 gas_constant = constants.GAS_CONSTANT
-rho_water = 977.8
-mu_water = 0.4035e-3
+# rho_water = 977.8
+# mu_water = 0.4035e-3
 
 # Electrochemical reaction parameters
-n_charge = 4.0
-n_stoich = [-1.0, 0.0, 2.0]
+n_charge = electrode_dict['charge_number']
+n_stoich = electrode_dict['reaction_stoichiometry']
 
 # Heat flux due to current density
-cathode_heat_flux_fraction = 0.7
+cathode_heat_flux_fraction = \
+    settings.boundary_conditions['cathode_heat_flux_fraction']
 heat_flux = (thermo_neutral_voltage - operating_voltage) * current_density \
             * cathode_heat_flux_fraction
 
 # Parameters for SGL 34BA (5% PTFE)
-thickness = 260e-6
-width = 2e-3
-porosity = 0.74
-permeability_abs = 1.88e-11
-thermal_conductivity = np.asarray([28.4, 2.8]) * porosity
-
-# PSD specific parameters
-r_k = np.asarray([[14.20e-6, 34.00e-6], [14.20e-6, 34.00e-6]])
-F_HI = 0.08
-F = np.asarray([F_HI, 1.0 - F_HI])
-f_k = np.asarray([[0.28, 0.72], [0.28, 0.72]])
-s_k = np.asarray([[0.35, 1.0], [0.35, 1.0]])
-
-contact_angles = np.asarray([70.0, 130.0])
-contact_angle = contact_angles[1]
-saturation_model = 'leverett'
-
-# Collect parameters in lists for each model
-sigma_water = fluids.calc_surface_tension(temp_bc)
-params_leverett = \
-    [sigma_water, contact_angle, porosity, permeability_abs]
-params_psd = [sigma_water, contact_angles, F, f_k, r_k, s_k]
+width = settings.domain['width']
+thickness = porous_dict['thickness']
+porosity = porous_dict['porosity']
+permeability_abs = porous_dict['permeability'][0]
+thermal_conductivity_eff = \
+    np.asarray(porous_dict['thermal_conductivity']) * porosity
 
 # Numerical resolution
-nx = 100
-ny = 10
+nx = settings.domain['nx']
+ny = settings.domain['ny']
 
 dx = width / nx
 dy = thickness / ny
@@ -90,14 +78,6 @@ L = dx * nx
 W = dy * ny
 mesh = Grid2D(dx=dx, dy=dy, nx=nx, ny=ny)
 X, Y = mesh.faceCenters
-
-# Select parameter set according to saturation model
-if saturation_model == 'leverett':
-    params = params_leverett
-elif saturation_model == 'psd':
-    params = params_psd
-else:
-    raise NotImplementedError
 
 # Create fluid object
 n_cells = mesh.numberOfCells
@@ -112,12 +92,20 @@ fluid_dict['components']['N2']['molar_fraction'] = \
 humid_air = fluid.factory(fluid_dict, backend='pemfc')
 humid_air.update()
 
+# Initialize saturation model
+saturation_dict = saturation_model_dict['leverett']
+saturation_dict['porosity'] = porosity
+saturation_dict['permeability'] = permeability_abs
+sat_model = sm.SaturationModel(saturation_dict)
+
 # Find specie to not explicitly solve for
 id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
 name_inert = humid_air.species_names[id_inert]
 
 # Constant factor for saturation "diffusion" coefficient
-D_s_const = rho_water / mu_water * permeability_abs
+# D_s_const = rho_water / mu_water * permeability_abs
+D_s_const = humid_air.liquid.density / humid_air.liquid.viscosity \
+    * permeability_abs
 
 # Initialize mesh variables
 # Saturation diffusion coefficient
@@ -125,7 +113,8 @@ D_s = CellVariable(mesh=mesh, value=D_s_const)
 D_s_f = FaceVariable(mesh=mesh, value=D_s.arithmeticFaceValue())
 
 # Concentration diffusion coefficients (only solve for n-1 species)
-solution_species = ['O2', 'H2O']
+solution_species = [name for i, name in enumerate(humid_air.species_names)
+                    if n_stoich[i] != 0.0]
 solve_species = \
     dict(zip(humid_air.species_names,
              [item in solution_species for item in humid_air.species_names]))
@@ -139,7 +128,7 @@ D_c_f = {name: FaceVariable(mesh=mesh, value=D_c[name].arithmeticFaceValue())
          for name in solution_species}
 
 # Thermal diffusion coefficient (conductivity)
-K_th = CellVariable(mesh=mesh, value=thermal_conductivity)
+K_th = CellVariable(mesh=mesh, value=thermal_conductivity_eff)
 
 # Liquid pressure
 p_liq = CellVariable(name="Liquid pressure",
@@ -178,7 +167,8 @@ facesTop = mesh.facesTop
 facesBottom = mesh.facesBottom
 
 # Boundary conditions for liquid pressure
-p_capillary_top = sat.get_capillary_pressure(s_chl, params, saturation_model)
+sigma_water_bc = humid_air.phase_change_species.calc_surface_tension(temp_bc)
+p_capillary_top = sat_model.calc_capillary_pressure(s_chl, sigma_water_bc)
 p_liquid_top = p_capillary_top + p_gas
 p_liq.setValue(p_liquid_top)
 # p_liq.constrain(p_liquid_top, facesTop)
@@ -261,6 +251,9 @@ while True:
     humid_air.update(temp.value.ravel(),
                      np.ones(temp.value.ravel().shape) * p_gas,
                      mole_composition=c_array)
+    t = temp.value.ravel()
+    sigma = humid_air.phase_change_species.calc_surface_tension(
+        temp.value.ravel())[0]
     # Update diffusion model
     diff_model.update(humid_air.temperature, humid_air.pressure,
                       humid_air.mole_fraction, update_names=solution_species)
@@ -284,9 +277,10 @@ while True:
     # Calculate capillary pressure
     p_cap[:] = p_liq.value - p_gas
 
+
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
-    s_new = sat.get_saturation(p_cap, params, saturation_model)
+    s_new = sat_model.calc_saturation(p_cap, sigma)
     s_value = urf * s_new + (1.0 - urf) * s_old
     s.setValue(s_value)
 
