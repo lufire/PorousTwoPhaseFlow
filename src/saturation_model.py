@@ -1,12 +1,8 @@
-import math
 import numpy as np
 from scipy import special
 from scipy import optimize
 from abc import ABC, abstractmethod
-
-SQRT_2 = math.sqrt(2.0)
-SQRT_2PI = math.sqrt(2.0 * math.pi)
-SMALL = 1e-10
+from parameters import SQRT_2
 
 
 class SaturationModel(ABC):

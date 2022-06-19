@@ -1,3 +1,5 @@
+import math
+
 fluid_dict = \
     {
         "name": "Cathode Gas Mixture",
@@ -26,7 +28,7 @@ porous_dict = \
         "name": "Cathode GDL",
         "thickness": 200e-6,
         "porosity": 0.78,
-        "tortuosity": 1.5,
+        "tortuosity_factor": 1.5,
         "permeability": (1.8e-11, 1.8e-11, 1.8e-11),
         "thermal_conductivity": (28.4, 2.8),
         "pore_radius": 1e-5,
@@ -66,6 +68,6 @@ saturation_model_dict = \
 
     }
 
-
-def calc_surface_tension(temperature):
-    return 0.07275 * (1.0 - 0.002 * (temperature - 291.0))
+SQRT_2 = math.sqrt(2.0)
+SQRT_2PI = math.sqrt(2.0 * math.pi)
+SMALL = 1e-10
