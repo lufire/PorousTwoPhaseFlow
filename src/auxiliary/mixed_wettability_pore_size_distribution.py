@@ -23,7 +23,6 @@ f_ch = [0.28, 0.72]
 F = [0.08, 1.0 - 0.08]
 
 
-
 def dX_dr(r):
     sqrt_2 = np.sqrt(2.0)
     sqrt_2pi = np.sqrt(2.0 * np.pi)
