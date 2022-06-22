@@ -18,9 +18,10 @@ from pemfc import constants
 from pemfc.src.fluid import fluid
 from pemfc.src.fluid import diffusion_model
 import saturation_model as sm
+import porous_layer as pl
 import settings
-from parameters import fluid_dict, porous_dict, electrode_dict, \
-    saturation_model_dict
+from parameters import fluid_dict, porous_dict, electrode_dict
+
 matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
@@ -61,7 +62,6 @@ heat_flux = (thermo_neutral_voltage - operating_voltage) * current_density \
 
 # Parameters for SGL 34BA (5% PTFE)
 width = settings.domain['width']
-thickness = porous_dict['thickness']
 porosity = porous_dict['porosity']
 permeability_abs = porous_dict['permeability'][0]
 thermal_conductivity_eff = \
@@ -70,6 +70,8 @@ thermal_conductivity_eff = \
 # Numerical resolution
 nx = settings.domain['nx']
 ny = settings.domain['ny']
+
+thickness = porous_dict['thickness']
 
 dx = width / nx
 dy = thickness / ny
@@ -92,11 +94,15 @@ fluid_dict['components']['N2']['molar_fraction'] = \
 humid_air = fluid.factory(fluid_dict, backend='pemfc')
 humid_air.update()
 
+# Initialize porous layer
+porous_layer = pl.PorousTwoPhaseLayer(porous_dict)
+
 # Initialize saturation model
-saturation_dict = saturation_model_dict['leverett']
-saturation_dict['porosity'] = porosity
-saturation_dict['permeability'] = permeability_abs
-sat_model = sm.SaturationModel(saturation_dict)
+# saturation_model = 'leverett'
+# saturation_dict = porous_dict['saturation_model'][saturation_model]
+# saturation_dict['porosity'] = porosity
+# saturation_dict['permeability'] = permeability_abs
+saturation_model = porous_layer.saturation_model
 
 # Find specie to not explicitly solve for
 id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
@@ -167,8 +173,9 @@ facesTop = mesh.facesTop
 facesBottom = mesh.facesBottom
 
 # Boundary conditions for liquid pressure
-sigma_water_bc = humid_air.phase_change_species.calc_surface_tension(temp_bc)
-p_capillary_top = sat_model.calc_capillary_pressure(s_chl, sigma_water_bc)
+sigma_water_bc = humid_air.phase_change_species.calc_surface_tension(temp_bc)[0]
+p_capillary_top = \
+    saturation_model.calc_capillary_pressure(s_chl, sigma_water_bc)
 p_liquid_top = p_capillary_top + p_gas
 p_liq.setValue(p_liquid_top)
 # p_liq.constrain(p_liquid_top, facesTop)
@@ -260,7 +267,7 @@ while True:
 
     # Update diffusion coefficients
     # Saturation transport coefficient
-    D_s.setValue(D_s_const * sat.k_s(s))
+    D_s.setValue(D_s_const * porous_layer.calc_relative_permeability(s))
     D_s_f.setValue(D_s.arithmeticFaceValue())
     # Concentration diffusion coefficients
     for name in solution_species:
@@ -280,7 +287,7 @@ while True:
 
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
-    s_new = sat_model.calc_saturation(p_cap, sigma)
+    s_new = saturation_model.calc_saturation(p_cap, sigma)
     s_value = urf * s_new + (1.0 - urf) * s_old
     s.setValue(s_value)
 

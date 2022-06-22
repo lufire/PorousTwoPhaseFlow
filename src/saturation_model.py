@@ -3,11 +3,14 @@ from scipy import special
 from scipy import optimize
 from abc import ABC, abstractmethod
 from parameters import SQRT_2
+import porous_layer as pl
 
 
 class SaturationModel(ABC):
 
-    def __new__(cls, model_dict):
+    def __new__(cls, model_dict, porous_layer):
+        if not isinstance(porous_layer, pl.PorousTwoPhaseLayer):
+            raise TypeError('porous_layer must be of type PorousTwoPhaseLayer')
         model_type = model_dict.get('type', 'leverett')
         if model_type == 'leverett':
             return super(SaturationModel, cls).\
@@ -18,7 +21,7 @@ class SaturationModel(ABC):
         else:
             raise NotImplementedError
 
-    def __init__(self, model_dict):
+    def __init__(self, model_dict, porous_layer):
         self.dict = model_dict
         self.model_type = model_dict['type']
 
@@ -39,11 +42,15 @@ class SaturationModel(ABC):
 
 
 class LeverettModel(SaturationModel):
-    def __init__(self, model_dict):
-        super().__init__(model_dict)
+    def __init__(self, model_dict, porous_layer):
+        super().__init__(model_dict, porous_layer)
         self.contact_angle = model_dict['contact_angle']
-        self.permeability = model_dict['permeability']
-        self.porosity = model_dict['porosity']
+        if isinstance(porous_layer.permeability, (list, tuple, np.ndarray)):
+            self.permeability = porous_layer.permeability[0]
+        else:
+            self.permeability = porous_layer.permeability
+        # model_dict['permeability']
+        self.porosity = porous_layer.porosity  # model_dict['porosity']
 
     def calc_capillary_pressure(self, saturation, surface_tension, *args,
                                 **kwargs):
@@ -101,13 +108,14 @@ class LeverettModel(SaturationModel):
 
 
 class PSDModel(SaturationModel):
-    def __init__(self, model_dict):
-        super().__init__(model_dict)
+    def __init__(self, model_dict, porous_layer):
+        super().__init__(model_dict, porous_layer)
         self.f = np.asarray(model_dict['f'])
         self.s = np.asarray(model_dict['s'])
         self.F = np.asarray(model_dict['F'])
         self.r = np.asarray(model_dict['r'])
-        self.contact_angle = np.asarray(model_dict['contact_angle'])
+        self.contact_angle = porous_layer.contact_angle
+        # np.asarray(model_dict['contact_angle'])
 
     def get_critical_radius(self, capillary_pressure, sigma):
         critical_radius_hydrophilic = \
