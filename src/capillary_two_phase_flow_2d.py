@@ -192,7 +192,6 @@ gas_mole_flux_cl = \
     {name: current_density * n_stoich[humid_air.species_id[name]]
      / (n_charge * faraday)
      for name in solution_species}
-# Setup saturation diffusion equation
 # Water flux due to current density
 liquid_mole_flux_cl = gas_mole_flux_cl['H2O'] * liquid_water_fraction_cl
 gas_mole_flux_cl['H2O'] *= (1.0 - liquid_water_fraction_cl)
@@ -210,13 +209,18 @@ c_bc = {name: humid_air.gas.concentration[humid_air.species_id[name], 0]
 for name in solution_species:
     c[name].constrain(c_bc[name], facesTopRight)
 
+# Source terms for equations
+src_s = CellVariable(mesh=mesh, value=0.0)
+src_t = CellVariable(mesh=mesh, value=0.0)
+src_c = {name: CellVariable(mesh=mesh, value=0.0) for name in solution_species}
+
 # Setup discretized transport equations
 eq_s = DiffusionTerm(coeff=D_s_f) \
-       - (facesBottom * liquid_mass_flux_cl).divergence
+       - (facesBottom * liquid_mass_flux_cl).divergence - src_s
 eq_t = DiffusionTerm(K_th) \
-       - (facesBottom * heat_flux).divergence
+       - (facesBottom * heat_flux).divergence - src_t
 eq_c = {name: DiffusionTerm(coeff=D_c_f[name])
-        - (facesBottom * gas_mole_flux_cl[name]).divergence
+        - (facesBottom * gas_mole_flux_cl[name]).divergence - src_c[name]
         for name in solution_species}
 
 # Setup numerical parameters
@@ -273,6 +277,20 @@ while True:
     for name in solution_species:
         D_c[name].setValue(diff_model.d_eff[humid_air.species_id[name]])
         D_c_f[name].setValue(D_c[name].arithmeticFaceValue())
+
+    # Update source terms
+    interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
+    evaporation_rate = humid_air.calc_evaporation_rate(temperature=t,
+                                                       pressure=p_gas,
+                                                       capillary_pressure=p_cap)
+    specific_area = interfacial_area / mesh.cellVolumes
+    volumetric_evap_rate = specific_area * evaporation_rate
+    src_s.setValue(-volumetric_evap_rate)
+    name_pc = humid_air.species_names[humid_air.id_pc]
+    mw_pc = humid_air.species_mw[humid_air.id_pc]
+    src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
+    evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
+    src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
 
     # Solve Transport equations
     residual_s = eq_s.sweep(var=p_liq)  # , underRelaxation=urfs[i])
