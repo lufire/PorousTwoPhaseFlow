@@ -5,43 +5,44 @@
 
 # .. index::
 #    single: Grid2D
+import copy
 import numpy as np
 from matplotlib import pyplot as plt
-from fipy import CellVariable, FaceVariable, Grid2D, Viewer, TransientTerm, \
-    DiffusionTerm
+from fipy import CellVariable, FaceVariable, Grid2D, Viewer, \
+    TransientTerm, DiffusionTerm, input
 from fipy.tools import numerix
-from fipy import input
+import fipy as fp
 import saturation as sat
 import matplotlib
 import pemfc
 from pemfc import constants
 from pemfc.src.fluid import fluid
 from pemfc.src.fluid import diffusion_model
-import saturation_model as sm
+from pemfc.src.fluid import evaporation_model
 import porous_layer as pl
-import settings
-from parameters import fluid_dict, porous_dict, electrode_dict
+from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
+    electrode_dict, evaporation_dict, numerical_dict
 
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
 # Operating conditions
-current_density = settings.boundary_conditions['current_density']
-temp_bc = settings.boundary_conditions['channel_temperature']
-operating_voltage = settings.boundary_conditions['operating_voltage']
+current_density = boundary_conditions['current_density']
+temp_bc = boundary_conditions['channel_temperature']
+operating_voltage = boundary_conditions['operating_voltage']
 
 # Humidity in channel
-h_chl = settings.boundary_conditions['channel_humidity']
+h_chl = boundary_conditions['channel_humidity']
 # Fraction of inlet oxygen concentration
 # (at simulated position along the channel)
-f_O2 = settings.boundary_conditions['oxygen_fraction']
+f_O2 = boundary_conditions['oxygen_fraction']
 # Saturation at channel gdl interace
-s_chl = settings.boundary_conditions['gdl_channel_saturation']
+s_chl = boundary_conditions['gdl_channel_saturation']
 # Constant gas pressure
-p_gas = settings.boundary_conditions['channel_pressure']
+p_gas = boundary_conditions['channel_pressure']
 # Liquid fraction (molar) of produced water at CL-GDL interface
 liquid_water_fraction_cl = \
-    settings.boundary_conditions['cl_gdl_liquid_water_fraction']
+    boundary_conditions['cl_gdl_liquid_water_fraction']
 
 # Physical parameters
 thermo_neutral_voltage = electrode_dict["thermoneutral_voltage"]
@@ -56,20 +57,20 @@ n_stoich = electrode_dict['reaction_stoichiometry']
 
 # Heat flux due to current density
 cathode_heat_flux_fraction = \
-    settings.boundary_conditions['cathode_heat_flux_fraction']
+    boundary_conditions['cathode_heat_flux_fraction']
 heat_flux = (thermo_neutral_voltage - operating_voltage) * current_density \
             * cathode_heat_flux_fraction
 
 # Parameters for SGL 34BA (5% PTFE)
-width = settings.domain['width']
+width = domain['width']
 porosity = porous_dict['porosity']
 permeability_abs = porous_dict['permeability'][0]
 thermal_conductivity_eff = \
     np.asarray(porous_dict['thermal_conductivity']) * porosity
 
 # Numerical resolution
-nx = settings.domain['nx']
-ny = settings.domain['ny']
+nx = domain['nx']
+ny = domain['ny']
 
 thickness = porous_dict['thickness']
 
@@ -97,12 +98,11 @@ humid_air.update()
 # Initialize porous layer
 porous_layer = pl.PorousTwoPhaseLayer(porous_dict)
 
-# Initialize saturation model
-# saturation_model = 'leverett'
-# saturation_dict = porous_dict['saturation_model'][saturation_model]
-# saturation_dict['porosity'] = porosity
-# saturation_dict['permeability'] = permeability_abs
+# Get saturation model
 saturation_model = porous_layer.saturation_model
+
+# Initialize evaporation model
+evap_model = evaporation_model.EvaporationModel(humid_air, evaporation_dict)
 
 # Find specie to not explicitly solve for
 id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
@@ -210,28 +210,45 @@ for name in solution_species:
     c[name].constrain(c_bc[name], facesTopRight)
 
 # Source terms for equations
-src_s = CellVariable(mesh=mesh, value=0.0)
+src_p = CellVariable(mesh=mesh, value=0.0)
 src_t = CellVariable(mesh=mesh, value=0.0)
 src_c = {name: CellVariable(mesh=mesh, value=0.0) for name in solution_species}
 
 # Setup discretized transport equations
-eq_s = DiffusionTerm(coeff=D_s_f) \
-       - (facesBottom * liquid_mass_flux_cl).divergence - src_s
+eq_p = DiffusionTerm(coeff=D_s_f) \
+       - (facesBottom * liquid_mass_flux_cl).divergence + src_p
 eq_t = DiffusionTerm(K_th) \
-       - (facesBottom * heat_flux).divergence - src_t
+       - (facesBottom * heat_flux).divergence + src_t
 eq_c = {name: DiffusionTerm(coeff=D_c_f[name])
-        - (facesBottom * gas_mole_flux_cl[name]).divergence - src_c[name]
+        - (facesBottom * gas_mole_flux_cl[name]).divergence + src_c[name]
         for name in solution_species}
 
 # Setup numerical parameters
-iter_max = 1000
-iter_min = 10
-error_tol = 1e-7
-urf = 0.5
-urfs = [0.5]
+s_min = s_chl
+iter_max = numerical_dict["maximum_iterations"]
+iter_min = numerical_dict["minimum_iterations"]
+error_tol = numerical_dict["error_tolerance"]
+urf = numerical_dict["under_relaxation_factor"]
+if isinstance(urf, (list, tuple)):
+    urf_array = np.asarray(urf)
+    n_start = 0
+    n_end = int(urf_array[0, 0])
+    # urf_id_list = [list(range(n_end))]
+    urf_value_list = [np.ones(n_end - n_start) * urf_array[1, 0]]
+    for i in range(urf_array.shape[-1] - 1):
+        n_start = int(urf_array[0, i])
+        n_end = int(urf_array[0, i+1])
+        # urf_id_list.append(list(range(n_start, n_end)))
+        urf_value_list.append(np.ones(n_end - n_start) * urf_array[1, i+1])
+
+    # urf_ids = [n for m in urf_id_list for n in m]
+    urf_array = np.concatenate(urf_value_list, axis=0)
+    # urf_list = urf_values]
+else:
+    urf_array = None
 s_value = np.ones(nx * ny) * s_chl
 s_old = np.copy(s_value)
-p_cap = np.ones(s_value.shape) * 1000.0
+p_cap = np.zeros(s_value.shape)  # * 1000.0
 p_cap_old = np.copy(p_cap)
 residual = np.inf
 iter_count = 0
@@ -239,6 +256,7 @@ residuals = []
 
 # Start iteration loop
 while True:
+
     # Check convergence criteria
     if iter_count > iter_min and residual <= error_tol:
         print('Solution converged with {} steps and residual = {}'.format(
@@ -248,6 +266,9 @@ while True:
         print('Solution did not converge within {} steps and residual = {}'
               ''.format(iter_count, residual))
         break
+
+    if urf_array is not None:
+        urf = urf_array[iter_count]
 
     # Calculate inert specie
     c_array = np.zeros((humid_air.n_species, n_cells))
@@ -259,12 +280,11 @@ while True:
     c_array[id_inert] = c_total - np.sum(c_array, axis=0)
 
     # Update fluid properties
-    humid_air.update(temp.value.ravel(),
-                     np.ones(temp.value.ravel().shape) * p_gas,
-                     mole_composition=c_array)
     t = temp.value.ravel()
-    sigma = humid_air.phase_change_species.calc_surface_tension(
-        temp.value.ravel())[0]
+    p = np.ones(temp.value.ravel().shape) * p_gas
+    humid_air.update(t, p, mole_composition=c_array)
+    sigma = humid_air.phase_change_species.calc_surface_tension(t)[0]
+
     # Update diffusion model
     diff_model.update(humid_air.temperature, humid_air.pressure,
                       humid_air.mole_fraction, update_names=solution_species)
@@ -279,74 +299,86 @@ while True:
         D_c_f[name].setValue(D_c[name].arithmeticFaceValue())
 
     # Update source terms
-    interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
-    evaporation_rate = humid_air.calc_evaporation_rate(temperature=t,
-                                                       pressure=p_gas,
-                                                       capillary_pressure=p_cap)
-    specific_area = interfacial_area / mesh.cellVolumes
-    volumetric_evap_rate = specific_area * evaporation_rate
-    src_s.setValue(-volumetric_evap_rate)
-    name_pc = humid_air.species_names[humid_air.id_pc]
-    mw_pc = humid_air.species_mw[humid_air.id_pc]
-    src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
-    evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
-    src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
+    if residual <= 1e-1:
+        interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
+        evaporation_rate = evap_model.calc_evaporation_rate(
+            temperature=t, pressure=p, capillary_pressure=p_cap)
+        specific_area = interfacial_area / mesh.cellVolumes
+        volumetric_evap_rate = specific_area * evaporation_rate
+        src_p.setValue(-volumetric_evap_rate)
+        # src_p.setValue(np.ones(s.value.shape) * 100.0)
+        name_pc = humid_air.species_names[humid_air.id_pc]
+        mw_pc = humid_air.species_mw[humid_air.id_pc]
+        src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
+        evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
+        src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
 
     # Solve Transport equations
-    residual_s = eq_s.sweep(var=p_liq)  # , underRelaxation=urfs[i])
+    residual_p = eq_p.sweep(var=p_liq)  # , underRelaxation=urfs[i])
     residual_t = eq_t.sweep(var=temp)
     residual_c = [eq_c[name].sweep(var=c[name]) for name in solution_species]
 
     # Save old capillary pressure
     p_cap_old = np.copy(p_cap)
-    # Calculate capillary pressure
+    # Calculate and constrain capillary pressure
     p_cap[:] = p_liq.value - p_gas
-
+    p_cap_min = saturation_model.calc_capillary_pressure(0.0, sigma)
+    p_cap_max = saturation_model.calc_capillary_pressure(1.0, sigma)
+    p_cap[p_cap < p_cap_min] = p_cap_min
+    p_cap[p_cap > p_cap_max] = p_cap_max
 
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
     s_new = saturation_model.calc_saturation(p_cap, sigma)
     s_value = urf * s_new + (1.0 - urf) * s_old
+    s_value[s_value < s_min] = s_min
     s.setValue(s_value)
 
-    s_diff = (s_value - s_old) / s_value
-    p_diff = (p_cap - p_cap_old) / p_cap
+    s_diff = s_value - s_old
+    s_diff[:] = np.divide(s_diff, s_value, where=s_value != 0.0)
+    p_diff = p_cap - p_cap_old
+    p_diff[:] = np.divide(p_diff, p_cap, where=p_cap != 0.0)
     eps_s = np.dot(s_diff.transpose(), s_diff) / (2.0 * len(s_diff))
     eps_p = np.dot(p_diff.transpose(), p_diff) / (2.0 * len(p_diff))
 
     eps = eps_s + eps_p
-    residual = residual_t + residual_s + np.sum(residual_c) + eps
+    residual = residual_t + residual_p + np.sum(residual_c) + eps
 
     # Update iteration counter
     residuals.append(residual)
     iter_count += 1
+
+p_liq.setValue(p_gas + p_cap)
 
 # Update mole fractions
 for name in humid_air.species_names:
     x[name].setValue(humid_air.gas.mole_fraction[humid_air.species_id[name]])
 
 if __name__ == '__main__':
-    viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
-    viewer.plot()
-    input("Saturation. Press <return> to proceed...")
-
-    viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
-    viewer.plot()
-    input("Temperature. Press <return> to proceed...")
-
-    viewer = Viewer(vars=x['O2'])  # , datamin=0., datamax=1.)
-    viewer.plot()
-    input("Temperature. Press <return> to proceed...")
-
+    # viewer = Viewer(vars=p_liq)  # , datamin=0., datamax=1.)
+    # viewer.plot()
+    # input("Liquid pressure. Press <return> to proceed...")
+    #
+    # viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
+    # viewer.plot()
+    # input("Saturation. Press <return> to proceed...")
+    #
+    # viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
+    # viewer.plot()
+    # input("Temperature. Press <return> to proceed...")
+    #
+    # viewer = Viewer(vars=x['O2'])  # , datamin=0., datamax=1.)
+    # viewer.plot()
+    # input("O2 Mole Fraction. Press <return> to proceed...")
+    #
+    # del viewer
     fig, ax = plt.subplots()
-    ax.plot(np.asarray(list(range(len(residuals)))), np.asarray(residuals))
-
-    # for i in range(len(urfs)):
-    #     ax.plot(list(range(len(residuals[i]))), residuals[i],
-    #             label='urf = ' + str(urfs[i]))
+    ax.plot(list(range(len(residuals))), np.asarray(residuals))
     ax.set_yscale('log')
-    # plt.legend()
+    # plt.plot(list(range(len(residuals))), np.asarray(residuals))
     plt.show()
+    input("Convergence. Press <return> to proceed...")
+
 
 # .. image:: mesh20x20steadyState.*
 #    :width: 90%

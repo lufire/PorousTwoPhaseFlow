@@ -2,7 +2,7 @@ import numpy as np
 from scipy import special
 from scipy import optimize
 from abc import ABC, abstractmethod
-from parameters import SQRT_2
+from settings import SQRT_2
 import porous_layer as pl
 
 
@@ -24,6 +24,8 @@ class SaturationModel(ABC):
     def __init__(self, model_dict, porous_layer):
         self.dict = model_dict
         self.model_type = model_dict['type']
+        self.s_min = model_dict.get('minimum_saturation', 1e-4)
+
 
     @abstractmethod
     def calc_saturation(self, capillary_pressure, surface_tension, *args,
@@ -45,6 +47,7 @@ class LeverettModel(SaturationModel):
     def __init__(self, model_dict, porous_layer):
         super().__init__(model_dict, porous_layer)
         self.contact_angle = model_dict['contact_angle']
+        self.contact_angle_rad = self.contact_angle * np.pi / 180.0
         if isinstance(porous_layer.permeability, (list, tuple, np.ndarray)):
             self.permeability = porous_layer.permeability[0]
         else:
@@ -75,15 +78,19 @@ class LeverettModel(SaturationModel):
 
     def leverett_p_s(self, saturation, surface_tension):
         factor = - surface_tension \
-            * np.cos(self.contact_angle * np.pi / 180.0) \
+            * np.cos(self.contact_angle_rad) \
             * np.sqrt(self.porosity / self.permeability)
         return factor * self.leverett_j(saturation)
 
     def leverett_s_p(self, capillary_pressure, surface_tension,
                      saturation_prev=None):
-        factor = - surface_tension * np.cos(self.contact_angle * np.pi /
-                                            180.0) \
+        factor = - surface_tension * np.cos(self.contact_angle_rad) \
             * np.sqrt(self.porosity / self.permeability)
+
+        min_pressure = self.leverett_p_s(0.0, surface_tension)
+        max_pressure = self.leverett_p_s(1.0, surface_tension)
+        capillary_pressure[capillary_pressure < min_pressure] = min_pressure
+        capillary_pressure[capillary_pressure > max_pressure] = max_pressure
 
         def root_leverett_p_s(s):
             return factor * self.leverett_j(s) \
@@ -91,7 +98,7 @@ class LeverettModel(SaturationModel):
         if saturation_prev is not None:
             s_in = saturation_prev
         else:
-            s_in = np.zeros(np.asarray(capillary_pressure).shape) + 0.01
+            s_in = np.zeros(np.asarray(capillary_pressure).shape) + self.s_min
         solution = optimize.newton(root_leverett_p_s, s_in)
         saturation = solution
         return saturation
@@ -151,6 +158,9 @@ class PSDModel(SaturationModel):
 
     def calc_capillary_pressure(self, saturation, surface_tension,
                                 capillary_pressure_prev=None, **kwargs):
+
+        saturation[saturation < self.s_min] = self.s_min
+        saturation[saturation > 1.0] = 1.0
 
         def root_saturation_psd(capillary_pressure):
             return saturation - \
