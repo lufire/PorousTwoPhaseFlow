@@ -4,12 +4,12 @@ boundary_conditions = \
     {
         'current_density': 10000.0,
         'operating_voltage': 0.8,
-        'channel_temperature': 353.15,
-        'channel_humidity': 0.5,
+        'channel_temperature': 343.15,
+        'channel_humidity': 1.0,
         'oxygen_fraction': 0.75,
         'gdl_channel_saturation': 0.001,
         'channel_pressure': 101325.0,
-        'cl_gdl_liquid_water_fraction': 1.0,
+        'cl_gdl_liquid_water_fraction': 0.0,
         'cathode_heat_flux_fraction': 0.7
     }
 
@@ -97,9 +97,9 @@ electrode_dict = \
 numerical_dict = \
     {
         "minimum_iterations": 10,
-        "maximum_iterations": 100,
+        "maximum_iterations": 500,
         "error_tolerance": 1e-7,
-        "under_relaxation_factor": [[300, 1000], [0.01, 0.1]]
+        "under_relaxation_factor": [[300, 1000], [0.001, 0.001]]
     }
 
 SQRT_2 = math.sqrt(2.0)

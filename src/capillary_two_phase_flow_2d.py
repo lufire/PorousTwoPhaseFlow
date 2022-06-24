@@ -299,7 +299,7 @@ while True:
         D_c_f[name].setValue(D_c[name].arithmeticFaceValue())
 
     # Update source terms
-    if residual <= 1e-1:
+    if True: # residual <= 1e-1:
         interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
         evaporation_rate = evap_model.calc_evaporation_rate(
             temperature=t, pressure=p, capillary_pressure=p_cap)
@@ -355,23 +355,22 @@ for name in humid_air.species_names:
     x[name].setValue(humid_air.gas.mole_fraction[humid_air.species_id[name]])
 
 if __name__ == '__main__':
-    # viewer = Viewer(vars=p_liq)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Liquid pressure. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Saturation. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Temperature. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=x['O2'])  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("O2 Mole Fraction. Press <return> to proceed...")
-    #
-    # del viewer
+    viewer = Viewer(vars=p_liq)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Liquid pressure. Press <return> to proceed...")
+
+    viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Saturation. Press <return> to proceed...")
+
+    viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Temperature. Press <return> to proceed...")
+
+    viewer = Viewer(vars=x['O2'])  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("O2 Mole Fraction. Press <return> to proceed...")
+
     fig, ax = plt.subplots()
     ax.plot(list(range(len(residuals))), np.asarray(residuals))
     ax.set_yscale('log')
