@@ -16,6 +16,7 @@ import saturation as sat
 import matplotlib
 import pemfc
 from pemfc import constants
+import constants as const
 from pemfc.src.fluid import fluid
 from pemfc.src.fluid import diffusion_model
 from pemfc.src.fluid import evaporation_model
@@ -299,7 +300,7 @@ while True:
         D_c_f[name].setValue(D_c[name].arithmeticFaceValue())
 
     # Update source terms
-    if True: # residual <= 1e-1:
+    if True:  # residual <= 1e-1:
         interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
         evaporation_rate = evap_model.calc_evaporation_rate(
             temperature=t, pressure=p, capillary_pressure=p_cap)
@@ -317,7 +318,9 @@ while True:
     residual_p = eq_p.sweep(var=p_liq)  # , underRelaxation=urfs[i])
     residual_t = eq_t.sweep(var=temp)
     residual_c = [eq_c[name].sweep(var=c[name]) for name in solution_species]
-
+    for name in solution_species:
+        c_value = c[name].value
+        c_value[c_value < const.SMALL] = const.SMALL
     # Save old capillary pressure
     p_cap_old = np.copy(p_cap)
     # Calculate and constrain capillary pressure
@@ -362,6 +365,10 @@ if __name__ == '__main__':
     viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
     viewer.plot()
     input("Saturation. Press <return> to proceed...")
+
+    viewer = Viewer(vars=src_p)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Condensation rate. Press <return> to proceed...")
 
     viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
     viewer.plot()

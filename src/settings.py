@@ -1,8 +1,6 @@
-import math
-
 boundary_conditions = \
     {
-        'current_density': 10000.0,
+        'current_density': 30000.0,
         'operating_voltage': 0.8,
         'channel_temperature': 343.15,
         'channel_humidity': 1.0,
@@ -15,8 +13,8 @@ boundary_conditions = \
 
 domain = \
     {
-        'width': 2e-3,
-        'nx': 100,
+        'width': 1e-3,
+        'nx': 50,
         'ny': 10,
     }
 
@@ -37,7 +35,7 @@ fluid_dict = \
                 "molar_fraction": 0.0
             }
         },
-        "humidity": 0.5,
+        "humidity": 1.0,
         "temperature": 343.15,
         "pressure": 101325.0,
     }
@@ -52,6 +50,7 @@ porous_dict = \
         "permeability": (1.8e-11, 1.8e-11, 1.8e-11),
         "thermal_conductivity": (28.4, 2.8),
         "pore_radius": 1e-5,
+        "relative_permeability_exponent": 3.0,
         "saturation_model":
             {  # "leverett" or "psd"
                 "type": "leverett",
@@ -99,9 +98,6 @@ numerical_dict = \
         "minimum_iterations": 10,
         "maximum_iterations": 500,
         "error_tolerance": 1e-7,
-        "under_relaxation_factor": [[300, 1000], [0.001, 0.001]]
+        "under_relaxation_factor": [[300, 1000], [0.3, 0.1]]
     }
 
-SQRT_2 = math.sqrt(2.0)
-SQRT_2PI = math.sqrt(2.0 * math.pi)
-SMALL = 1e-10

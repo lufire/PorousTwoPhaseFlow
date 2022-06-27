@@ -1,4 +1,4 @@
-name: porous_flow_env
+name: porous_flow
 channels:
     - defaults
 dependencies:
