@@ -3,7 +3,7 @@ import numpy as np
 from scipy import special
 from scipy import optimize
 from abc import ABC, abstractmethod
-import saturation_model as sm
+from src import saturation_model as sm
 
 
 class PorousLayer(ABC):

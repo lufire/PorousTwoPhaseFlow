@@ -2,7 +2,7 @@ import numpy as np
 from scipy import special
 from scipy import optimize
 from abc import ABC, abstractmethod
-from constants import SQRT_2
+from src.constants import SQRT_2
 import porous_layer as pl
 
 

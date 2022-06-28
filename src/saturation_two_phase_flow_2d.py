@@ -113,7 +113,8 @@ id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
 name_inert = humid_air.species_names[id_inert]
 
 # Constant factor for saturation "diffusion" coefficient
-minus_dpc_ds = 22.95
+minus_dpc_ds = 20000
+# minus_dpc_ds = 22.95
 # D_s_const = rho_water / mu_water * permeability_abs
 D_s_const = humid_air.liquid.density * permeability_abs\
     / (humid_air.liquid.viscosity * water_mw) * minus_dpc_ds
