@@ -7,7 +7,7 @@ boundary_conditions = \
         'oxygen_fraction': 0.75,
         'gdl_channel_saturation': 0.001,
         'channel_pressure': 101325.0,
-        'cl_gdl_liquid_water_fraction': 0.0,
+        'cl_gdl_liquid_water_fraction': 1.0,
         'cathode_heat_flux_fraction': 0.7
     }
 
@@ -47,7 +47,7 @@ porous_dict = \
         "thickness": 200e-6,
         "porosity": 0.78,
         "bruggemann_coefficient": 1.5,
-        "permeability": (1.8e-11, 1.8e-11, 1.8e-11),
+        "permeability": (1.0e-12, 1.0e-12, 1.0e-12),
         "thermal_conductivity": (28.4, 2.8),
         "pore_radius": 1e-5,
         "relative_permeability_exponent": 3.0,

@@ -10,7 +10,7 @@ import numpy as np
 from scipy import special
 from scipy import optimize
 from matplotlib import pyplot as plt
-import saturation as sat
+from src import saturation as sat
 
 
 def leverett_hi(s):
@@ -52,7 +52,7 @@ temp = 343.15
 surface_tension = 0.07275 * (1.0 - 0.002 * (temp - 291.0))
 porosity = 0.78
 permeability = 6.2e-12
-contact_angles = [70.0, 130.0]
+contact_angles = [70.0, 120.0]
 
 # psd specific parameters
 r_k = np.asarray([[14.20e-6, 34.00e-6], [14.20e-6, 34.00e-6]])
@@ -68,22 +68,46 @@ saturations = []
 for contact_angle in contact_angles:
     params_leverett = [surface_tension, contact_angle, porosity, permeability]
     saturations.append(sat.get_saturation(
-        capillary_pressure, [], params_leverett, model_type='leverett'))
+        capillary_pressure, params_leverett, model_type='leverett'))
 
 params_psd = [surface_tension, contact_angles, F, f_k, r_k, s_k]
 saturations.append(sat.get_saturation(
-        capillary_pressure, params_psd, [], model_type='psd'))
+        capillary_pressure, params_psd, model_type='psd'))
 
 # create plots
-fig, ax = plt.subplots(dpi=150)
+# fig, ax = plt.subplots(dpi=150)
+#
+# linestyles = ['solid', 'dotted', 'dashed']
+# colors = ['k', 'r', 'b']
+# labels = ['Leverett-J {}°'.format(str(int(item))) for item in contact_angles]
+# labels.append('PSD')
+# for i in range(len(saturations)):
+# # ax.plot(capillary_pressure, saturation)
+#     ax.plot(saturations[i], capillary_pressure, linestyle=linestyles[i],
+#             color=colors[i], label=labels[i])
+# ax.legend()
+#
+# # ax.set_xlim([0.0, 1.0])
+# # ax.set_ylim([-2000, 2000.0])
+# # s = np.linspace(0.0, 1.0, 100)
+# # j = leverett_j(s, contact_angle)
+#
+# # fig, ax = plt.subplots(dpi=150)
+# # ax.plot(s, j)
+# plt.tight_layout()
+# plt.show()
 
+dpc_ds = []
+# create plots
+fig, ax = plt.subplots(dpi=150)
 linestyles = ['solid', 'dotted', 'dashed']
 colors = ['k', 'r', 'b']
 labels = ['Leverett-J {}°'.format(str(int(item))) for item in contact_angles]
 labels.append('PSD')
-for i in range(len(saturations)):
+for i in range(len(saturations)-1):
+    dpc_ds = np.diff(capillary_pressure) / np.diff(saturations[i])
 # ax.plot(capillary_pressure, saturation)
-    ax.plot(saturations[i], capillary_pressure, linestyle=linestyles[i],
+    ax.plot(saturations[i][:-1], dpc_ds, linestyle=linestyles[i],
             color=colors[i], label=labels[i])
 ax.legend()
 

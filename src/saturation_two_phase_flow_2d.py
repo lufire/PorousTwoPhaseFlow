@@ -39,6 +39,7 @@ h_chl = boundary_conditions['channel_humidity']
 f_O2 = boundary_conditions['oxygen_fraction']
 # Saturation at channel gdl interace
 s_chl = boundary_conditions['gdl_channel_saturation']
+s_min = s_chl
 # Constant gas pressure
 p_gas = boundary_conditions['channel_pressure']
 # Liquid fraction (molar) of produced water at CL-GDL interface
@@ -105,14 +106,18 @@ saturation_model = porous_layer.saturation_model
 # Initialize evaporation model
 evap_model = evaporation_model.EvaporationModel(humid_air, evaporation_dict)
 
+water_id = humid_air.species_id['H2O']
+water_mw = humid_air.species.mw[humid_air.species_id['H2O']]
 # Find specie to not explicitly solve for
 id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
 name_inert = humid_air.species_names[id_inert]
 
 # Constant factor for saturation "diffusion" coefficient
+minus_dpc_ds = 22.95
 # D_s_const = rho_water / mu_water * permeability_abs
-D_s_const = humid_air.liquid.density / humid_air.liquid.viscosity \
-    * permeability_abs
+D_s_const = humid_air.liquid.density * permeability_abs\
+    / (humid_air.liquid.viscosity * water_mw) * minus_dpc_ds
+
 
 # Initialize mesh variables
 # Saturation diffusion coefficient
@@ -144,7 +149,7 @@ p_liq = CellVariable(name="Liquid pressure",
                      hasOld=True)
 
 # Saturation
-s = CellVariable(mesh=mesh, value=0.0, hasOld=True)
+s = CellVariable(mesh=mesh, value=s_min, hasOld=True)
 
 # Temperature
 temp = CellVariable(mesh=mesh, value=temp_bc)
@@ -181,6 +186,7 @@ p_liquid_top = p_capillary_top + p_gas
 p_liq.setValue(p_liquid_top)
 # p_liq.constrain(p_liquid_top, facesTop)
 p_liq.constrain(p_liquid_top, facesTopRight)
+s.constrain(s_chl, facesTopRight)
 # p_liq_bot = p_liquid_top + 200.0
 # p_liq.constrain(p_liq_bot, facesBottom)
 # p_liq.faceGrad.constrain(water_flux, facesBottom)
@@ -196,9 +202,7 @@ gas_mole_flux_cl = \
 # Water flux due to current density
 liquid_mole_flux_cl = gas_mole_flux_cl['H2O'] * liquid_water_fraction_cl
 gas_mole_flux_cl['H2O'] *= (1.0 - liquid_water_fraction_cl)
-water_id = humid_air.species_id['H2O']
-liquid_mass_flux_cl = \
-    liquid_mole_flux_cl * humid_air.species.mw[humid_air.species_id['H2O']]
+liquid_mass_flux_cl = liquid_mole_flux_cl * water_mw
 
 # Boundary conditions for temperature
 temp.constrain(temp_bc, facesTopLeft)
@@ -211,13 +215,13 @@ for name in solution_species:
     c[name].constrain(c_bc[name], facesTopRight)
 
 # Source terms for equations
-src_p = CellVariable(mesh=mesh, value=0.0)
+src_s = CellVariable(mesh=mesh, value=0.0)
 src_t = CellVariable(mesh=mesh, value=0.0)
 src_c = {name: CellVariable(mesh=mesh, value=0.0) for name in solution_species}
 
 # Setup discretized transport equations
-eq_p = DiffusionTerm(coeff=D_s_f) \
-       - (facesBottom * liquid_mass_flux_cl).divergence + src_p
+eq_s = DiffusionTerm(coeff=D_s_f) \
+       - (facesBottom * liquid_mole_flux_cl).divergence + src_s
 eq_t = DiffusionTerm(K_th) \
        - (facesBottom * heat_flux).divergence + src_t
 eq_c = {name: DiffusionTerm(coeff=D_c_f[name])
@@ -225,7 +229,6 @@ eq_c = {name: DiffusionTerm(coeff=D_c_f[name])
         for name in solution_species}
 
 # Setup numerical parameters
-s_min = s_chl
 iter_max = numerical_dict["maximum_iterations"]
 iter_min = numerical_dict["minimum_iterations"]
 error_tol = numerical_dict["error_tolerance"]
@@ -247,10 +250,10 @@ if isinstance(urf, (list, tuple)):
     # urf_list = urf_values]
 else:
     urf_array = None
-s_value = np.ones(nx * ny) * s_chl
+
+s_value = s.value + s_min
 s_old = np.copy(s_value)
 p_cap = np.zeros(s_value.shape)  # * 1000.0
-p_cap_old = np.copy(p_cap)
 residual = np.inf
 iter_count = 0
 residuals = []
@@ -292,7 +295,7 @@ while True:
 
     # Update diffusion coefficients
     # Saturation transport coefficient
-    D_s.setValue(D_s_const * porous_layer.calc_relative_permeability(s))
+    D_s.setValue(D_s_const * s)
     D_s_f.setValue(D_s.arithmeticFaceValue())
     # Concentration diffusion coefficients
     for name in solution_species:
@@ -306,8 +309,8 @@ while True:
     #         temperature=t, pressure=p, capillary_pressure=p_cap)
     #     specific_area = interfacial_area / mesh.cellVolumes
     #     volumetric_evap_rate = specific_area * evaporation_rate
-    #     src_p.setValue(-volumetric_evap_rate)
-    #     # src_p.setValue(np.ones(s.value.shape) * 100.0)
+    #     src_s.setValue(-volumetric_evap_rate)
+    #     # src_s.setValue(np.ones(s.value.shape) * 100.0)
     #     name_pc = humid_air.species_names[humid_air.id_pc]
     #     mw_pc = humid_air.species_mw[humid_air.id_pc]
     #     src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
@@ -315,21 +318,14 @@ while True:
     #     src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
 
     # Solve Transport equations
-    residual_p = eq_p.sweep(var=p_liq)  # , underRelaxation=urfs[i])
+    residual_s = eq_s.sweep(var=s)  # , underRelaxation=urfs[i])
     residual_t = eq_t.sweep(var=temp)
     # residual_t = 0.0
     residual_c = [eq_c[name].sweep(var=c[name]) for name in solution_species]
     for name in solution_species:
         c_value = c[name].value
         c_value[c_value < const.SMALL] = const.SMALL
-    # Save old capillary pressure
-    p_cap_old = np.copy(p_cap)
-    # Calculate and constrain capillary pressure
-    p_cap[:] = p_liq.value - p_gas
-    p_cap_min = saturation_model.calc_capillary_pressure(0.0, sigma)
-    p_cap_max = saturation_model.calc_capillary_pressure(1.0, sigma)
-    p_cap[p_cap < p_cap_min] = p_cap_min
-    p_cap[p_cap > p_cap_max] = p_cap_max
+
 
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
@@ -337,6 +333,17 @@ while True:
     s_value = urf * s_new + (1.0 - urf) * s_old
     s_value[s_value < s_min] = s_min
     s.setValue(s_value)
+
+    # Save old capillary pressure
+    p_cap_old = np.copy(p_cap)
+    # Calculate and constrain capillary pressure
+    p_cap[:] = saturation_model.calc_capillary_pressure(s.value, sigma)
+
+    # p_liq.setValue(p_cap + p_gas)
+    # p_cap_min = saturation_model.calc_capillary_pressure(0.0, sigma)
+    # p_cap_max = saturation_model.calc_capillary_pressure(1.0, sigma)
+    # p_cap[p_cap < p_cap_min] = p_cap_min
+    # p_cap[p_cap > p_cap_max] = p_cap_max
 
     s_diff = s_value - s_old
     s_diff[:] = np.divide(s_diff, s_value, where=s_value != 0.0)
@@ -346,7 +353,7 @@ while True:
     eps_p = np.dot(p_diff.transpose(), p_diff) / (2.0 * len(p_diff))
 
     eps = eps_s + eps_p
-    residual = residual_t + residual_p + np.sum(residual_c) + eps
+    residual = residual_t + residual_s + np.sum(residual_c) + eps
 
     # Update iteration counter
     residuals.append(residual)
@@ -367,7 +374,7 @@ if __name__ == '__main__':
     viewer.plot()
     input("Saturation. Press <return> to proceed...")
 
-    viewer = Viewer(vars=src_p)  # , datamin=0., datamax=1.)
+    viewer = Viewer(vars=src_s)  # , datamin=0., datamax=1.)
     viewer.plot()
     input("Condensation rate. Press <return> to proceed...")
 
