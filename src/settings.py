@@ -1,10 +1,10 @@
 boundary_conditions = \
     {
-        'current_density': 30000.0,
+        'current_density': 7500.0,
         'operating_voltage': 0.8,
-        'channel_temperature': 343.15,
+        'channel_temperature': 353.15,
         'channel_humidity': 1.0,
-        'oxygen_fraction': 0.75,
+        'oxygen_fraction': 1.0,
         'gdl_channel_saturation': 0.001,
         'channel_pressure': 101325.0,
         'cl_gdl_liquid_water_fraction': 1.0,
@@ -24,11 +24,11 @@ fluid_dict = \
         "components": {
             "O2": {
                 "state": "gas",
-                "molar_fraction": 0.21
+                "molar_fraction": 1.0
             },
             "N2": {
                 "state": "gas",
-                "molar_fraction": 0.79
+                "molar_fraction": 0.0
             },
             "H2O": {
                 "state": "gas-liquid",
@@ -45,7 +45,7 @@ porous_dict = \
         "name": "Cathode GDL",
         "type": "CarbonPaper",
         "thickness": 200e-6,
-        "porosity": 0.78,
+        "porosity": 0.6,
         "bruggemann_coefficient": 1.5,
         "permeability": (1.0e-12, 1.0e-12, 1.0e-12),
         "thermal_conductivity": (28.4, 2.8),
@@ -96,8 +96,8 @@ electrode_dict = \
 numerical_dict = \
     {
         "minimum_iterations": 10,
-        "maximum_iterations": 500,
+        "maximum_iterations": 1000,
         "error_tolerance": 1e-7,
-        "under_relaxation_factor": [[300, 1000], [0.3, 0.1]]
+        "under_relaxation_factor": [[500, 1000], [0.3, 0.1]]
     }
 

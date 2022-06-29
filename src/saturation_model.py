@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import special
 from scipy import optimize
+from scipy.interpolate import interp1d
 from abc import ABC, abstractmethod
 from src.constants import SQRT_2
 import porous_layer as pl
@@ -26,7 +27,6 @@ class SaturationModel(ABC):
         self.model_type = model_dict['type']
         self.s_min = model_dict.get('minimum_saturation', 1e-4)
 
-
     @abstractmethod
     def calc_saturation(self, capillary_pressure, surface_tension, *args,
                         **kwargs):
@@ -41,6 +41,14 @@ class SaturationModel(ABC):
     def young_laplace(capillary_pressure, sigma, contact_angle):
         return - 1.0 * 2.0 * sigma * np.cos(contact_angle * np.pi / 180.0) \
                / capillary_pressure
+
+    def calc_dpc_ds(self, saturation, sigma):
+        s_range = np.linspace(self.s_min, 1.0, 1000)
+        ds = np.diff(s_range)[0]
+        pc_range = self.calc_capillary_pressure(s_range, sigma)
+        dpc_ds_range = np.gradient(pc_range, ds)
+        dpc_ds = interp1d(s_range, dpc_ds_range, kind='linear')
+        return dpc_ds(saturation)
 
 
 class LeverettModel(SaturationModel):

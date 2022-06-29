@@ -299,20 +299,20 @@ while True:
         D_c[name].setValue(diff_model.d_eff[humid_air.species_id[name]])
         D_c_f[name].setValue(D_c[name].arithmeticFaceValue())
 
-    # # Update source terms
-    # if True:  # residual <= 1e-1:
-    #     interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
-    #     evaporation_rate = evap_model.calc_evaporation_rate(
-    #         temperature=t, pressure=p, capillary_pressure=p_cap)
-    #     specific_area = interfacial_area / mesh.cellVolumes
-    #     volumetric_evap_rate = specific_area * evaporation_rate
-    #     src_p.setValue(-volumetric_evap_rate)
-    #     # src_p.setValue(np.ones(s.value.shape) * 100.0)
-    #     name_pc = humid_air.species_names[humid_air.id_pc]
-    #     mw_pc = humid_air.species_mw[humid_air.id_pc]
-    #     src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
-    #     evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
-    #     src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
+    # Update source terms
+    if True:  # residual <= 1e-1:
+        interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
+        evaporation_rate = evap_model.calc_evaporation_rate(
+            temperature=t, pressure=p, capillary_pressure=p_cap)
+        specific_area = interfacial_area / mesh.cellVolumes
+        volumetric_evap_rate = specific_area * evaporation_rate
+        src_p.setValue(-volumetric_evap_rate)
+        # src_p.setValue(np.ones(s.value.shape) * 100.0)
+        name_pc = humid_air.species_names[humid_air.id_pc]
+        mw_pc = humid_air.species_mw[humid_air.id_pc]
+        src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
+        evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
+        src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
 
     # Solve Transport equations
     residual_p = eq_p.sweep(var=p_liq)  # , underRelaxation=urfs[i])

@@ -113,11 +113,9 @@ id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
 name_inert = humid_air.species_names[id_inert]
 
 # Constant factor for saturation "diffusion" coefficient
-minus_dpc_ds = 20000
-# minus_dpc_ds = 22.95
 # D_s_const = rho_water / mu_water * permeability_abs
-D_s_const = humid_air.liquid.density * permeability_abs\
-    / (humid_air.liquid.viscosity * water_mw) * minus_dpc_ds
+D_s_const = humid_air.liquid.density * permeability_abs \
+            / (humid_air.liquid.viscosity * water_mw)
 
 
 # Initialize mesh variables
@@ -296,7 +294,9 @@ while True:
 
     # Update diffusion coefficients
     # Saturation transport coefficient
-    D_s.setValue(D_s_const * s)
+    # dpc_ds = 22.95
+    dpc_ds = saturation_model.calc_dpc_ds(s, sigma)
+    D_s.setValue(D_s_const * dpc_ds * s ** 3.0)
     D_s_f.setValue(D_s.arithmeticFaceValue())
     # Concentration diffusion coefficients
     for name in solution_species:
@@ -333,6 +333,7 @@ while True:
     s_new = saturation_model.calc_saturation(p_cap, sigma)
     s_value = urf * s_new + (1.0 - urf) * s_old
     s_value[s_value < s_min] = s_min
+    s_value[s_value > 1.0] = 1.0
     s.setValue(s_value)
 
     # Save old capillary pressure
