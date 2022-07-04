@@ -28,7 +28,7 @@ from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
 
 # Physical boundary conditions and parameters
 # Operating conditions
-current_density = boundary_conditions['current_density']
+avg_current_density = boundary_conditions['avg_current_density']
 temp_bc = boundary_conditions['channel_temperature']
 operating_voltage = boundary_conditions['operating_voltage']
 
@@ -59,8 +59,9 @@ n_stoich = electrode_dict['reaction_stoichiometry']
 # Heat flux due to current density
 cathode_heat_flux_fraction = \
     boundary_conditions['cathode_heat_flux_fraction']
-heat_flux = (thermo_neutral_voltage - operating_voltage) * current_density \
-            * cathode_heat_flux_fraction
+avg_heat_flux = (thermo_neutral_voltage - operating_voltage) \
+                * avg_current_density \
+                * cathode_heat_flux_fraction
 
 # Parameters for SGL 34BA (5% PTFE)
 width = domain['width']
@@ -168,15 +169,27 @@ x = {name: CellVariable(name='x_' + name, mesh=mesh,
 # facesBottomRight = ((mesh.facesRight & (Y < L / 2))
 #                     | (mesh.facesBottom & (X > L / 2)))
 # Specify boundary patches
-facesTopLeft = (mesh.facesTop & (X < L / 2.0))
-facesTopRight = (mesh.facesTop & (X >= L / 2.0))
 facesTop = mesh.facesTop
+facesTopLeft = (facesTop & (X < L / 2.0))
+facesTopRight = (facesTop & (X >= L / 2.0))
 facesBottom = mesh.facesBottom
+facesBottomLeft = (facesBottom & (X < L / 2.0))
+facesBottomRight = (facesBottom & (X >= L / 2.0))
+
+distribution = 0.5
+face_weights = facesBottomLeft * (1.0 + distribution) \
+               + facesBottomRight * (1.0 - distribution)
+bc_current_density = face_weights * avg_current_density
+bc_heat_flux = face_weights * avg_heat_flux
+
 
 # Boundary conditions for liquid pressure
 sigma_water_bc = humid_air.phase_change_species.calc_surface_tension(temp_bc)[0]
+# p_capillary_top = \
+#     saturation_model.calc_capillary_pressure(s_chl, sigma_water_bc)
 p_capillary_top = \
-    saturation_model.calc_capillary_pressure(s_chl, sigma_water_bc)
+    saturation_model.calc_capillary_pressure(s_chl, h_chl)
+
 p_liquid_top = p_capillary_top + p_gas
 p_liq.setValue(p_liquid_top)
 # p_liq.constrain(p_liquid_top, facesTop)
@@ -190,8 +203,8 @@ for name in solution_species:
 
 # Flux boundary conditions
 gas_mole_flux_cl = \
-    {name: current_density * n_stoich[humid_air.species_id[name]]
-     / (n_charge * faraday)
+    {name: bc_current_density * n_stoich[humid_air.species_id[name]]
+           / (n_charge * faraday)
      for name in solution_species}
 # Water flux due to current density
 liquid_mole_flux_cl = gas_mole_flux_cl['H2O'] * liquid_water_fraction_cl
@@ -215,13 +228,14 @@ src_p = CellVariable(mesh=mesh, value=0.0)
 src_t = CellVariable(mesh=mesh, value=0.0)
 src_c = {name: CellVariable(mesh=mesh, value=0.0) for name in solution_species}
 
+test = liquid_mass_flux_cl.divergence
 # Setup discretized transport equations
 eq_p = DiffusionTerm(coeff=D_s_f) \
-       - (facesBottom * liquid_mass_flux_cl).divergence + src_p
+       - liquid_mass_flux_cl.divergence + src_p
 eq_t = DiffusionTerm(K_th) \
-       - (facesBottom * heat_flux).divergence + src_t
+       - bc_heat_flux.divergence + src_t
 eq_c = {name: DiffusionTerm(coeff=D_c_f[name])
-        - (facesBottom * gas_mole_flux_cl[name]).divergence + src_c[name]
+        - gas_mole_flux_cl[name].divergence + src_c[name]
         for name in solution_species}
 
 # Setup numerical parameters
@@ -248,6 +262,7 @@ if isinstance(urf, (list, tuple)):
 else:
     urf_array = None
 s_value = np.ones(nx * ny) * s_chl
+s.setValue(s_value)
 s_old = np.copy(s_value)
 p_cap = np.zeros(s_value.shape)  # * 1000.0
 p_cap_old = np.copy(p_cap)
@@ -325,15 +340,22 @@ while True:
     # Save old capillary pressure
     p_cap_old = np.copy(p_cap)
     # Calculate and constrain capillary pressure
-    p_cap[:] = p_liq.value - p_gas
-    p_cap_min = saturation_model.calc_capillary_pressure(0.0, sigma)
-    p_cap_max = saturation_model.calc_capillary_pressure(1.0, sigma)
+    p_cap_new = p_liq.value - p_gas
+    p_cap[:] = urf * p_cap_new + (1.0 - urf) * p_cap_old
+    # p_cap_min = saturation_model.calc_capillary_pressure(s_min, sigma)
+    p_cap_min = saturation_model.calc_capillary_pressure(s_min, h_chl)
+
+    # p_cap_max = saturation_model.calc_capillary_pressure(0.99, sigma)
+    p_cap_max = saturation_model.calc_capillary_pressure(0.99, h_chl)
+
     p_cap[p_cap < p_cap_min] = p_cap_min
     p_cap[p_cap > p_cap_max] = p_cap_max
 
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
-    s_new = saturation_model.calc_saturation(p_cap, sigma)
+    # s_new = saturation_model.calc_saturation(p_cap, sigma)
+    s_new = saturation_model.calc_saturation(p_cap, humid_air.humidity)
+
     s_value = urf * s_new + (1.0 - urf) * s_old
     s_value[s_value < s_min] = s_min
     s.setValue(s_value)

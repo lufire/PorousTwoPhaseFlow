@@ -28,7 +28,7 @@ from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
 
 # Physical boundary conditions and parameters
 # Operating conditions
-current_density = boundary_conditions['current_density']
+current_density = boundary_conditions['avg_current_density']
 temp_bc = boundary_conditions['channel_temperature']
 operating_voltage = boundary_conditions['operating_voltage']
 
@@ -296,7 +296,8 @@ while True:
     # Saturation transport coefficient
     # dpc_ds = 22.95
     dpc_ds = saturation_model.calc_dpc_ds(s, sigma)
-    D_s.setValue(D_s_const * dpc_ds * s ** 3.0)
+    D_s.setValue(D_s_const * dpc_ds *
+                 porous_layer.calc_relative_permeability(s))
     D_s_f.setValue(D_s.arithmeticFaceValue())
     # Concentration diffusion coefficients
     for name in solution_species:

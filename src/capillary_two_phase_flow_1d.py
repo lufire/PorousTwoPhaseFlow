@@ -237,7 +237,7 @@ fig, ax = plt.subplots(dpi=100)
 colors = ['k', 'r', 'k', 'r']
 linestyles = ['solid', 'solid', 'dashed', 'dashed']
 labels = ['F_HI: {}'.format(str(float(item))) for item in F_HI_list]
-# ax.plot(current_density, saturation_avg)
+# ax.plot(avg_current_density, saturation_avg)
 for i in range(len(saturations)):
     ax.plot(z * 1e6, saturations[i]) #, color=colors[i], linestyle=linestyles[i])
 

@@ -62,7 +62,7 @@ f_k = np.asarray([[0.28, 0.72], [0.28, 0.72]])
 s_k = np.asarray([[0.35, 1.0], [0.35, 1.0]])
 
 # calculate saturation from given capillariy pressures
-capillary_pressure = np.linspace(-5000.0, 5000.0, 500)
+capillary_pressure = np.linspace(-100000.0, 100000.0, 500)
 # capillary_pressure = np.linspace(11, 13.0, 100)
 saturations = []
 for contact_angle in contact_angles:
@@ -75,41 +75,15 @@ saturations.append(sat.get_saturation(
         capillary_pressure, params_psd, model_type='psd'))
 
 # create plots
-# fig, ax = plt.subplots(dpi=150)
-#
-# linestyles = ['solid', 'dotted', 'dashed']
-# colors = ['k', 'r', 'b']
-# labels = ['Leverett-J {}°'.format(str(int(item))) for item in contact_angles]
-# labels.append('PSD')
-# for i in range(len(saturations)):
-# # ax.plot(capillary_pressure, saturation)
-#     ax.plot(saturations[i], capillary_pressure, linestyle=linestyles[i],
-#             color=colors[i], label=labels[i])
-# ax.legend()
-#
-# # ax.set_xlim([0.0, 1.0])
-# # ax.set_ylim([-2000, 2000.0])
-# # s = np.linspace(0.0, 1.0, 100)
-# # j = leverett_j(s, contact_angle)
-#
-# # fig, ax = plt.subplots(dpi=150)
-# # ax.plot(s, j)
-# plt.tight_layout()
-# plt.show()
-
-dpc_ds = []
-# create plots
 fig, ax = plt.subplots(dpi=150)
+
 linestyles = ['solid', 'dotted', 'dashed']
 colors = ['k', 'r', 'b']
 labels = ['Leverett-J {}°'.format(str(int(item))) for item in contact_angles]
 labels.append('PSD')
-for i in range(len(saturations)-1):
-    dpc = np.diff(capillary_pressure)
-    ds = np.diff(saturations[i])
-    dpc_ds = np.divide(dpc, ds, where=ds != 0)
+for i in range(len(saturations)):
 # ax.plot(capillary_pressure, saturation)
-    ax.plot(saturations[i][:-1], dpc_ds, linestyle=linestyles[i],
+    ax.plot(saturations[i], capillary_pressure, linestyle=linestyles[i],
             color=colors[i], label=labels[i])
 ax.legend()
 
@@ -122,3 +96,29 @@ ax.legend()
 # ax.plot(s, j)
 plt.tight_layout()
 plt.show()
+
+# dpc_ds = []
+# # create plots
+# fig, ax = plt.subplots(dpi=150)
+# linestyles = ['solid', 'dotted', 'dashed']
+# colors = ['k', 'r', 'b']
+# labels = ['Leverett-J {}°'.format(str(int(item))) for item in contact_angles]
+# labels.append('PSD')
+# for i in range(len(saturations)-1):
+#     dpc = np.diff(capillary_pressure)
+#     ds = np.diff(saturations[i])
+#     dpc_ds = np.divide(dpc, ds, where=ds != 0)
+# # ax.plot(capillary_pressure, saturation)
+#     ax.plot(saturations[i][:-1], dpc_ds, linestyle=linestyles[i],
+#             color=colors[i], label=labels[i])
+# ax.legend()
+
+# ax.set_xlim([0.0, 1.0])
+# ax.set_ylim([-2000, 2000.0])
+# s = np.linspace(0.0, 1.0, 100)
+# j = leverett_j(s, contact_angle)
+
+# fig, ax = plt.subplots(dpi=150)
+# ax.plot(s, j)
+# plt.tight_layout()
+# plt.show()

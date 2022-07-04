@@ -1,7 +1,4 @@
-import math
 import numpy as np
-from scipy import special
-from scipy import optimize
 from abc import ABC, abstractmethod
 from src import saturation_model as sm
 
@@ -43,9 +40,9 @@ class PorousTwoPhaseLayer(PorousLayer, ABC):
     def calc_two_phase_interfacial_area(self, saturation):
         pass
 
-    def calc_relative_permeability(self, saturation, s_min=1e-6):
+    def calc_relative_permeability(self, saturation):
         saturation = np.copy(saturation)
-        saturation[saturation == 0.0] = s_min
+        saturation[saturation <= 0.0] = self.saturation_model.s_min
         return saturation ** self.n_rel
 
 

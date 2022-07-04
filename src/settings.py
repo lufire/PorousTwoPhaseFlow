@@ -1,8 +1,8 @@
 boundary_conditions = \
     {
-        'current_density': 7500.0,
+        'avg_current_density': 7500.0,
         'operating_voltage': 0.8,
-        'channel_temperature': 353.15,
+        'channel_temperature': 343.15,
         'channel_humidity': 1.0,
         'oxygen_fraction': 1.0,
         'gdl_channel_saturation': 0.001,
@@ -24,11 +24,11 @@ fluid_dict = \
         "components": {
             "O2": {
                 "state": "gas",
-                "molar_fraction": 1.0
+                "molar_fraction": 0.21
             },
             "N2": {
                 "state": "gas",
-                "molar_fraction": 0.0
+                "molar_fraction": 0.79
             },
             "H2O": {
                 "state": "gas-liquid",
@@ -36,7 +36,7 @@ fluid_dict = \
             }
         },
         "humidity": 1.0,
-        "temperature": 343.15,
+        "temperature": 313.15,
         "pressure": 101325.0,
     }
 
@@ -52,8 +52,9 @@ porous_dict = \
         "pore_radius": 1e-5,
         "relative_permeability_exponent": 3.0,
         "saturation_model":
-            {  # "leverett" or "psd"
-                "type": "leverett",
+            {  # "leverett", "psd", "imbibition_drainage",
+                # or "gostick_correlation"
+                "type": "gostick_correlation",
                 "leverett":
                     {
                         "type": "leverett",
@@ -67,9 +68,44 @@ porous_dict = \
                         "f": [[0.28, 0.72], [0.28, 0.72]],
                         "s": [[0.35, 1.0], [0.35, 1.0]],
                         "contact_angle": [80.0, 120.0]  # [theta_HI, theta_HO]
-                    }
+                    },
+                "imbibition_drainage":
+                    {  # "leverett" or "psd"
+                        "type": "imbibition_drainage",
+                        "imbibition_model":
+                            {
+                                "type": "gostick_correlation",
+                                "maximum_water_saturation": 0.99,
+                                "residual_water_saturation": 0.1,
+                                "f": [0.25, 0.75],
+                                "m": [250, 200],  # [F_HI, F_HO]
+                                "n": [0.4, 0.5],
+                                "P_C_b": [101500.0, 107500.0]
+                            },
+                        "drainage_model":
+                            {
+                                "type": "gostick_correlation",
+                                "maximum_water_saturation": 0.99,
+                                "residual_water_saturation": 0.1,
+                                "f": [1.0],
+                                "m": [150],  # [F_HI, F_HO]
+                                "n": [1.0],
+                                "P_C_b": [105000.0]
+                            }
+                    },
+                "gostick_correlation":
+                    {
+                        "type": "gostick_correlation",
+                        "maximum_saturation": 1.0,
+                        "residual_saturation": 0.0,
+                        "f": [0.25, 0.75],
+                        "m": [250, 200],  # [F_HI, F_HO]
+                        "n": [0.3, 0.5],
+                        "P_C_b": [101500.0, 108000.0]
+                    },
 
             }
+
     }
 
 evaporation_dict = \
@@ -96,7 +132,7 @@ electrode_dict = \
 numerical_dict = \
     {
         "minimum_iterations": 10,
-        "maximum_iterations": 1000,
+        "maximum_iterations": 500,
         "error_tolerance": 1e-7,
         "under_relaxation_factor": [[500, 1000], [0.3, 0.1]]
     }

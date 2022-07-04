@@ -135,7 +135,7 @@ for j in range(1):
 
         # print(solution.message)
         saturations.append(saturation)
-        # print('Current density (A/m²): ', current_density[0])
+        # print('Current density (A/m²): ', avg_current_density[0])
         #
         # print('Average saturation (-): ', np.average(saturation))
         # print('GDL-channel interface saturation (-): ', saturation[-1])
