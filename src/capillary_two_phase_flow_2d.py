@@ -23,7 +23,7 @@ from pemfc.src.fluid import evaporation_model
 import porous_layer as pl
 from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
     electrode_dict, evaporation_dict, numerical_dict
-
+import helper_functions as hf
 # matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
@@ -98,7 +98,7 @@ humid_air = fluid.factory(fluid_dict, backend='pemfc')
 humid_air.update()
 
 # Initialize porous layer
-porous_layer = pl.PorousTwoPhaseLayer(porous_dict)
+porous_layer = pl.PorousTwoPhaseLayer(porous_dict, humid_air)
 
 # Get saturation model
 saturation_model = porous_layer.saturation_model
@@ -185,10 +185,10 @@ bc_heat_flux = face_weights * avg_heat_flux
 
 # Boundary conditions for liquid pressure
 sigma_water_bc = humid_air.phase_change_species.calc_surface_tension(temp_bc)[0]
-# p_capillary_top = \
-#     saturation_model.calc_capillary_pressure(s_chl, sigma_water_bc)
 p_capillary_top = \
-    saturation_model.calc_capillary_pressure(s_chl, h_chl)
+    saturation_model.calc_capillary_pressure(s_chl,
+                                             surface_tension=sigma_water_bc,
+                                             humidity=h_chl)
 
 p_liquid_top = p_capillary_top + p_gas
 p_liq.setValue(p_liquid_top)
@@ -244,23 +244,8 @@ iter_max = numerical_dict["maximum_iterations"]
 iter_min = numerical_dict["minimum_iterations"]
 error_tol = numerical_dict["error_tolerance"]
 urf = numerical_dict["under_relaxation_factor"]
-if isinstance(urf, (list, tuple)):
-    urf_array = np.asarray(urf)
-    n_start = 0
-    n_end = int(urf_array[0, 0])
-    # urf_id_list = [list(range(n_end))]
-    urf_value_list = [np.ones(n_end - n_start) * urf_array[1, 0]]
-    for i in range(urf_array.shape[-1] - 1):
-        n_start = int(urf_array[0, i])
-        n_end = int(urf_array[0, i+1])
-        # urf_id_list.append(list(range(n_start, n_end)))
-        urf_value_list.append(np.ones(n_end - n_start) * urf_array[1, i+1])
+urf_array = hf.make_urf_array(urf)
 
-    # urf_ids = [n for m in urf_id_list for n in m]
-    urf_array = np.concatenate(urf_value_list, axis=0)
-    # urf_list = urf_values]
-else:
-    urf_array = None
 s_value = np.ones(nx * ny) * s_chl
 s.setValue(s_value)
 s_old = np.copy(s_value)
@@ -341,20 +326,22 @@ while True:
     p_cap_old = np.copy(p_cap)
     # Calculate and constrain capillary pressure
     p_cap_new = p_liq.value - p_gas
-    p_cap[:] = urf * p_cap_new + (1.0 - urf) * p_cap_old
-    # p_cap_min = saturation_model.calc_capillary_pressure(s_min, sigma)
-    p_cap_min = saturation_model.calc_capillary_pressure(s_min, h_chl)
+    # p_cap[:] = urf * p_cap_new + (1.0 - urf) * p_cap_old
+    p_cap[:] = p_cap_new
 
-    # p_cap_max = saturation_model.calc_capillary_pressure(0.99, sigma)
-    p_cap_max = saturation_model.calc_capillary_pressure(0.99, h_chl)
-
+    p_cap_min = saturation_model.calc_capillary_pressure(
+        s_min,  surface_tension=np.min(humid_air.surface_tension),
+        humidity=np.max(humid_air.humidity))
+    p_cap_max = saturation_model.calc_capillary_pressure(
+        0.99,  surface_tension=np.max(humid_air.surface_tension),
+        humidity=np.min(humid_air.humidity))
     p_cap[p_cap < p_cap_min] = p_cap_min
     p_cap[p_cap > p_cap_max] = p_cap_max
 
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
-    # s_new = saturation_model.calc_saturation(p_cap, sigma)
-    s_new = saturation_model.calc_saturation(p_cap, humid_air.humidity)
+    s_new = saturation_model.calc_saturation(p_cap)
+    # s_new = saturation_model.calc_saturation(p_cap, humid_air.humidity)
 
     s_value = urf * s_new + (1.0 - urf) * s_old
     s_value[s_value < s_min] = s_min

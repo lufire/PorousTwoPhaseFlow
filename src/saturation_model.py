@@ -1,4 +1,5 @@
 import numpy as np
+import pemfc.src.fluid.fluid as fl
 from scipy import special
 from scipy import optimize
 from scipy.interpolate import interp1d
@@ -9,9 +10,12 @@ import porous_layer as pl
 
 class SaturationModel(ABC):
 
-    def __new__(cls, model_dict, porous_layer):
+    def __new__(cls, model_dict, porous_layer, fluid):
         if not isinstance(porous_layer, pl.PorousTwoPhaseLayer):
             raise TypeError('porous_layer must be of type PorousTwoPhaseLayer')
+        if not isinstance(fluid, fl.TwoPhaseMixture):
+            raise TypeError('fluid must be of type TwoPhaseMixture')
+
         model_type = model_dict.get('type', 'leverett')
         if model_type == 'leverett':
             return super(SaturationModel, cls).__new__(LeverettModel)
@@ -24,19 +28,18 @@ class SaturationModel(ABC):
         else:
             raise NotImplementedError
 
-    def __init__(self, model_dict, porous_layer):
+    def __init__(self, model_dict, porous_layer, fluid):
+        self.fluid = fluid
         self.dict = model_dict
         self.model_type = model_dict['type']
         self.s_min = model_dict.get('minimum_saturation', 1e-3)
 
     @abstractmethod
-    def calc_saturation(self, capillary_pressure, surface_tension, *args,
-                        **kwargs):
+    def calc_saturation(self, capillary_pressure, *args, **kwargs):
         pass
 
     @abstractmethod
-    def calc_capillary_pressure(self, saturation, surface_tension, *args,
-                                **kwargs):
+    def calc_capillary_pressure(self, saturation, *args, **kwargs):
         pass
 
     @staticmethod
@@ -44,18 +47,18 @@ class SaturationModel(ABC):
         return - 1.0 * 2.0 * sigma * np.cos(contact_angle * np.pi / 180.0) \
                / capillary_pressure
 
-    def calc_dpc_ds(self, saturation, sigma):
-        s_range = np.linspace(self.s_min, 1.0, 1000)
+    def calc_dpc_ds(self, saturation, *args, **kwargs):
+        s_range = np.linspace(self.s_min, 1.0, len(saturation))
         ds = np.diff(s_range)[0]
-        pc_range = self.calc_capillary_pressure(s_range, sigma)
+        pc_range = self.calc_capillary_pressure(s_range, *args, **kwargs)
         dpc_ds_range = np.gradient(pc_range, ds)
         dpc_ds = interp1d(s_range, dpc_ds_range, kind='linear')
         return dpc_ds(saturation)
 
 
 class LeverettModel(SaturationModel):
-    def __init__(self, model_dict, porous_layer):
-        super().__init__(model_dict, porous_layer)
+    def __init__(self, model_dict, porous_layer, fluid):
+        super().__init__(model_dict, porous_layer, fluid)
         self.contact_angle = model_dict['contact_angle']
         self.contact_angle_rad = self.contact_angle * np.pi / 180.0
         if isinstance(porous_layer.permeability, (list, tuple, np.ndarray)):
@@ -65,9 +68,9 @@ class LeverettModel(SaturationModel):
         # model_dict['permeability']
         self.porosity = porous_layer.porosity  # model_dict['porosity']
 
-    def calc_capillary_pressure(self, saturation, surface_tension, *args,
-                                **kwargs):
-
+    def calc_capillary_pressure(self, saturation, *args, **kwargs):
+        surface_tension = kwargs.get('surface_tension',
+                                     self.fluid.surface_tension)
         return self.leverett_p_s(saturation, surface_tension)
 
     @staticmethod
@@ -97,8 +100,8 @@ class LeverettModel(SaturationModel):
         factor = - surface_tension * np.cos(self.contact_angle_rad) \
             * np.sqrt(self.porosity / self.permeability)
 
-        min_pressure = self.leverett_p_s(0.0, surface_tension)
-        max_pressure = self.leverett_p_s(1.0, surface_tension)
+        min_pressure = self.leverett_p_s(self.s_min, np.min(surface_tension))
+        max_pressure = self.leverett_p_s(1.0, np.max(surface_tension))
         capillary_pressure[capillary_pressure < min_pressure] = min_pressure
         capillary_pressure[capillary_pressure > max_pressure] = max_pressure
 
@@ -113,11 +116,12 @@ class LeverettModel(SaturationModel):
         saturation = solution
         return saturation
 
-    def calc_saturation(self, capillary_pressure, surface_tension, *args,
+    def calc_saturation(self, capillary_pressure, *args,
                         saturation_prev=None, **kwargs):
-
+        surface_tension = kwargs.get('surface_tension',
+                                     self.fluid.surface_tension)
         saturation = \
-            self.leverett_s_p(capillary_pressure, surface_tension,
+            self.leverett_s_p(capillary_pressure,surface_tension,
                               saturation_prev=saturation_prev)
         # return saturation
         return np.where(saturation < self.s_min, self.s_min,
@@ -125,8 +129,8 @@ class LeverettModel(SaturationModel):
 
 
 class PSDModel(SaturationModel):
-    def __init__(self, model_dict, porous_layer):
-        super().__init__(model_dict, porous_layer)
+    def __init__(self, model_dict, porous_layer, fluid):
+        super().__init__(model_dict, porous_layer, fluid)
         self.f = np.asarray(model_dict['f'])
         self.s = np.asarray(model_dict['s'])
         self.F = np.asarray(model_dict['F'])
@@ -134,15 +138,15 @@ class PSDModel(SaturationModel):
         self.contact_angle = np.asarray(model_dict['contact_angle'])
         # np.asarray(model_dict['contact_angle'])
 
-    def get_critical_radius(self, capillary_pressure, sigma):
+    def get_critical_radius(self, capillary_pressure, surface_tension):
         critical_radius_hydrophilic = \
             np.where(capillary_pressure < 0.0,
-                     self.young_laplace(capillary_pressure, sigma,
+                     self.young_laplace(capillary_pressure, surface_tension,
                                         self.contact_angle[0]),
                      np.inf)
         critical_radius_hydrophobic = \
             np.where(capillary_pressure < 0.0, np.inf,
-                     self.young_laplace(capillary_pressure, sigma,
+                     self.young_laplace(capillary_pressure, surface_tension,
                                         self.contact_angle[1]))
 
         # critical_radius_hydrophilic[critical_radius_hydrophilic < 0.0] = SMALL
@@ -151,10 +155,11 @@ class PSDModel(SaturationModel):
         return np.asarray([critical_radius_hydrophilic,
                            critical_radius_hydrophobic])
 
-    def calc_saturation(self, capillary_pressure, surface_tension, *args,
-                        **kwargs):
-        critical_radius = self.get_critical_radius(
-            capillary_pressure, surface_tension)
+    def calc_saturation(self, capillary_pressure, *args, **kwargs):
+        surface_tension = kwargs.get('surface_tension',
+                                     self.fluid.surface_tension)
+        critical_radius = self.get_critical_radius(capillary_pressure,
+                                                   surface_tension)
         saturation = np.zeros(critical_radius.shape[-1])
         phi = [1, -1]
         for i in range(self.f.shape[0]):
@@ -167,7 +172,7 @@ class PSDModel(SaturationModel):
         return np.where(saturation < self.s_min, self.s_min,
                         np.where(saturation > 1.0, 1.0, saturation))
 
-    def calc_capillary_pressure(self, saturation, surface_tension,
+    def calc_capillary_pressure(self, saturation,
                                 capillary_pressure_prev=None, **kwargs):
         if isinstance(saturation, np.ndarray):
             saturation[saturation < self.s_min] = self.s_min
@@ -175,7 +180,7 @@ class PSDModel(SaturationModel):
 
         def root_saturation_psd(capillary_pressure):
             return saturation - \
-                   self.calc_saturation(capillary_pressure, surface_tension)
+                   self.calc_saturation(capillary_pressure)
 
         if capillary_pressure_prev is not None:
             p_c_in = capillary_pressure_prev
@@ -193,8 +198,8 @@ class GostickCorrelation(SaturationModel):
     Power Sources 194, no. 1 (October 2009): 433–44.
     https://doi.org/10.1016/j.jpowsour.2009.04.052.
     """
-    def __init__(self, model_dict, porous_layer):
-        super().__init__(model_dict, porous_layer)
+    def __init__(self, model_dict, porous_layer, fluid):
+        super().__init__(model_dict, porous_layer, fluid)
         self.s_w_m = model_dict.get('maximum_saturation', 1.0)
         self.s_w_r = model_dict.get('residual_saturation', 0.0)
         self.f = model_dict['f']
@@ -244,32 +249,34 @@ class ImbibitionDrainageCurve(SaturationModel):
     Publikationsserver der RWTH Aachen University, 2015.
     https://publications.rwth-aachen.de/record/464442.
     """
-    def __init__(self, model_dict, porous_layer):
-        super().__init__(model_dict, porous_layer)
+    def __init__(self, model_dict, porous_layer, fluid):
+        super().__init__(model_dict, porous_layer, fluid)
         drainage_dict = model_dict['drainage_model']
-        self.drainage_model = SaturationModel(drainage_dict, porous_layer)
+        self.drainage_model = SaturationModel(drainage_dict, porous_layer,
+                                              fluid)
         imbibition_dict = model_dict['imbibition_model']
-        self.imbibition_model = SaturationModel(imbibition_dict, porous_layer)
+        self.imbibition_model = SaturationModel(imbibition_dict,
+                                                porous_layer, fluid)
 
-    def calc_saturation(self, capillary_pressure,
-                        relative_humidity, *args, **kwargs):
+    def calc_saturation(self, capillary_pressure, *args, **kwargs):
         sat_imb = self.imbibition_model.calc_saturation(capillary_pressure,
                                                         *args, **kwargs)
         sat_drain = self.drainage_model.calc_saturation(capillary_pressure,
                                                         *args, **kwargs)
-        sat = sat_imb * np.heaviside(1.0 - relative_humidity, 0.0) \
-            + sat_drain * np.heaviside(relative_humidity - 1.0, 1.0)
+        humidity = kwargs.get('humidity', self.fluid.humidity)
+        sat = sat_imb * np.heaviside(1.0 - humidity, 0.0) \
+            + sat_drain * np.heaviside(humidity - 1.0, 1.0)
         return sat
 
-    def calc_capillary_pressure(self, saturation, relative_humidity,
-                                capillary_pressure_prev=None, **kwargs):
+    def calc_capillary_pressure(self, saturation, capillary_pressure_prev=None,
+                                **kwargs):
         if isinstance(saturation, np.ndarray):
             saturation[saturation < self.s_min] = self.s_min
             saturation[saturation > 1.0] = 1.0
 
         def root_saturation(capillary_pressure):
             return saturation - \
-                   self.calc_saturation(capillary_pressure, relative_humidity)
+                   self.calc_saturation(capillary_pressure)
 
         if capillary_pressure_prev is not None:
             p_c_in = capillary_pressure_prev

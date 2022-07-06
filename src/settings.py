@@ -103,9 +103,7 @@ porous_dict = \
                         "n": [0.3, 0.5],
                         "P_C_b": [101500.0, 108000.0]
                     },
-
             }
-
     }
 
 evaporation_dict = \
@@ -131,9 +129,9 @@ electrode_dict = \
 
 numerical_dict = \
     {
-        "minimum_iterations": 10,
+        "minimum_iterations": 2,
         "maximum_iterations": 500,
         "error_tolerance": 1e-7,
-        "under_relaxation_factor": [[500, 1000], [0.3, 0.1]]
+        "under_relaxation_factor": [[500, 1000], [0.1, 0.1]]
     }
 

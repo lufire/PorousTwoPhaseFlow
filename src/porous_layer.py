@@ -5,16 +5,15 @@ from src import saturation_model as sm
 
 class PorousLayer(ABC):
 
-    def __new__(cls, model_dict):
+    def __new__(cls, model_dict, fluid):
         model_type = model_dict.get('type', 'CarbonPaper')
         if model_type == 'CarbonPaper':
-            return super(PorousLayer, cls).\
-                __new__(CarbonPaper)
+            return super(PorousLayer, cls).__new__(CarbonPaper)
 
         else:
             raise NotImplementedError
 
-    def __init__(self, model_dict):
+    def __init__(self, model_dict, fluid):
         self.dict = model_dict
         self.model_type = model_dict['type']
 
@@ -25,8 +24,8 @@ class PorousLayer(ABC):
 
 
 class PorousTwoPhaseLayer(PorousLayer, ABC):
-    def __init__(self, model_dict):
-        super().__init__(model_dict)
+    def __init__(self, model_dict, fluid):
+        super().__init__(model_dict, fluid)
         self.porosity = model_dict['porosity']
         self.permeability = model_dict['permeability']
         self.n_rel = model_dict.get('relative_permeability_exponent', 3.0)
@@ -34,7 +33,7 @@ class PorousTwoPhaseLayer(PorousLayer, ABC):
         self.saturation_model = \
             sm.SaturationModel(
                 model_dict['saturation_model'][self.saturation_model_type],
-                self)
+                self, fluid)
 
     @abstractmethod
     def calc_two_phase_interfacial_area(self, saturation):
@@ -47,8 +46,8 @@ class PorousTwoPhaseLayer(PorousLayer, ABC):
 
 
 class CarbonPaper(PorousTwoPhaseLayer):
-    def __init__(self, model_dict):
-        super().__init__(model_dict)
+    def __init__(self, model_dict, fluid):
+        super().__init__(model_dict, fluid)
         self.bruggemann_coeff = model_dict['bruggemann_coefficient']
         # self.contact_angle = model_dict['contact_angle']
         self.pore_radius = model_dict['pore_radius']
