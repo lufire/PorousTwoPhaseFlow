@@ -109,7 +109,7 @@ saturation_model = porous_layer.saturation_model
 evap_model = evaporation_model.EvaporationModel(humid_air, evaporation_dict)
 
 water_id = humid_air.species_id['H2O']
-water_mw = humid_air.species.mw[humid_air.species_id['H2O']]
+water_mw = humid_air.species.mw[water_id]
 # Find specie to not explicitly solve for
 id_inert = np.where(np.asarray(n_stoich) == 0.0)[-1][0]
 name_inert = humid_air.species_names[id_inert]
@@ -239,7 +239,8 @@ error_tol = numerical_dict["error_tolerance"]
 urf = numerical_dict["under_relaxation_factor"]
 urf_array = hf.make_urf_array(urf)
 
-s_value = s.value + s_min
+s_value = np.ones(s.value.shape) * 0.1 #s_chl
+s.setValue(s_value)
 s_old = np.copy(s_value)
 p_cap = np.zeros(s_value.shape)  # * 1000.0
 residual = np.inf
@@ -250,7 +251,7 @@ time_1 = time.time()
 while True:
     time_0 = time_1
     time_1 = time.time()
-    print('iteration {}: '.format(iter_count), time_1 - time_0)
+    # print('iteration {}: '.format(iter_count), time_1 - time_0)
     # Check convergence criteria
     if iter_count > iter_min and residual <= error_tol:
         print('Solution converged with {} steps and residual = {}'.format(
@@ -278,7 +279,7 @@ while True:
     p = np.ones(temp.value.ravel().shape) * p_gas
     humid_air.update(t, p, mole_composition=c_array)
     sigma = humid_air.phase_change_species.calc_surface_tension(t)[0]
-
+    # sigma = sigma_water_bc
     # Update diffusion model
     diff_model.update(humid_air.temperature, humid_air.pressure,
                       humid_air.mole_fraction, update_names=solution_species)
@@ -288,13 +289,13 @@ while True:
     # dpc_ds = 22.95
     time_0 = time_1
     time_1 = time.time()
-    print('initial section: '.format(iter_count), time_1 - time_0)
+    # print('initial section: '.format(iter_count), time_1 - time_0)
 
-    dpc_ds = saturation_model.calc_dpc_ds(s)
+    dpc_ds = saturation_model.calc_gradient(s)
 
     time_0 = time_1
     time_1 = time.time()
-    print('gradient calculation: '.format(iter_count), time_1 - time_0)
+    # print('gradient calculation: '.format(iter_count), time_1 - time_0)
 
     D_s.setValue(D_s_const * dpc_ds *
                  porous_layer.calc_relative_permeability(s))
@@ -307,11 +308,14 @@ while True:
     # Update source terms
     if True:  # residual <= 1e-1:
         interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
+        # evaporation_rate = evap_model.calc_evaporation_rate(
+        #     temperature=t, pressure=p, capillary_pressure=p_cap)
         evaporation_rate = evap_model.calc_evaporation_rate(
-            temperature=t, pressure=p, capillary_pressure=p_cap)
+            saturation=s.value, temperature=t, pressure=p,
+            capillary_pressure=p_cap, porosity=porosity)
         specific_area = interfacial_area / mesh.cellVolumes
         volumetric_evap_rate = specific_area * evaporation_rate
-        src_s.setValue(-volumetric_evap_rate)
+        src_s.setValue(-volumetric_evap_rate / water_mw)
         # src_s.setValue(np.ones(s.value.shape) * 100.0)
         name_pc = humid_air.species_names[humid_air.id_pc]
         mw_pc = humid_air.species_mw[humid_air.id_pc]
@@ -321,7 +325,7 @@ while True:
 
     time_0 = time_1
     time_1 = time.time()
-    print('source term calculation: '.format(iter_count), time_1 - time_0)
+    # print('source term calculation: '.format(iter_count), time_1 - time_0)
 
     # Solve Transport equations
     residual_s = eq_s.sweep(var=s)  # , underRelaxation=urfs[i])
@@ -334,7 +338,7 @@ while True:
 
     time_0 = time_1
     time_1 = time.time()
-    print('solve equations: '.format(iter_count), time_1 - time_0)
+    # print('solve equations: '.format(iter_count), time_1 - time_0)
     # Calculate new saturation values using under-relaxation
     s_old = np.copy(s.value)
     s_new = saturation_model.calc_saturation(p_cap, sigma)
@@ -373,7 +377,8 @@ while True:
     residuals.append(residual)
     time_0 = time_1
     time_1 = time.time()
-    print('residual calculations: '.format(iter_count), time_1 - time_0)
+    # print('residual calculations: '.format(iter_count), time_1 - time_0)
+    # print('iteration: {}, residual: {}'.format(iter_count, residual))
     iter_count += 1
 
 p_liq.setValue(p_gas + p_cap)

@@ -195,7 +195,7 @@ for F_HI in F_HI_list:
 
                 p_c_new = p_liquid - p_gas
 
-                p_c = p_c_new  # urf * p_c_old + (1.0 - urf) * p_c_new
+                p_c = p_c_new  # urf_sat * p_c_old + (1.0 - urf_sat) * p_c_new
                 s_old = np.copy(s)
 
                 s_new = \

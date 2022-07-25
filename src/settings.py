@@ -45,7 +45,7 @@ porous_dict = \
         "name": "Cathode GDL",
         "type": "CarbonPaper",
         "thickness": 200e-6,
-        "porosity": 0.6,
+        "porosity": 0.8,
         "bruggemann_coefficient": 1.5,
         "permeability": (1.0e-12, 1.0e-12, 1.0e-12),
         "thermal_conductivity": (28.4, 2.8),
@@ -53,12 +53,20 @@ porous_dict = \
         "relative_permeability_exponent": 3.0,
         "saturation_model":
             {  # "leverett", "psd", "imbibition_drainage",
-                # or "gostick_correlation"
-                "type": "gostick_correlation",
+                # "gostick_correlation", "data_table", or "psd"
+                "type": "data_table",
                 "leverett":
                     {
                         "type": "leverett",
-                        "contact_angle": 120.0
+                        "contact_angle": 120.0,
+                        # "precalculate_pressure": True,
+                        # "precalculate_gradient": True
+                    },
+                "data_table":
+                    {
+                        "type": "data_table",
+                        "data_format": "file",
+                        "file_path": r"C:\Users\lukas\Desktop\test.csv"
                     },
                 "psd":
                     {
@@ -106,11 +114,18 @@ porous_dict = \
             }
     }
 
+# evaporation_dict = \
+#     {
+#         "name": "Evaporation Model",
+#         "type": "HertzKnudsenSchrage",
+#         "evaporation_coefficient": 0.37,
+#     }
 evaporation_dict = \
     {
         "name": "Evaporation Model",
-        "type": "HertzKnudsenSchrage",
-        "evaporation_coefficient": 0.37,
+        "type": "WangSi",
+        "evaporation_coefficient": 1e-4,
+        "condensation_coefficient": 5000
     }
 
 electrode_dict = \
@@ -129,9 +144,11 @@ electrode_dict = \
 
 numerical_dict = \
     {
-        "minimum_iterations": 2,
-        "maximum_iterations": 500,
+        "minimum_iterations": 10,
+        "maximum_iterations": 100,
         "error_tolerance": 1e-7,
-        "under_relaxation_factor": [[500, 1000], [0.1, 0.1]]
+        "under_relaxation_factor":
+            {"saturation": [[500, 1000], [0.2, 0.01]],
+             "temperature": 0.001}
     }
 
