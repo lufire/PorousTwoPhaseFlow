@@ -150,12 +150,12 @@ p_liq = CellVariable(name="Liquid pressure",
 s = CellVariable(mesh=mesh, value=0.0, hasOld=True)
 
 # Temperature
-temp = CellVariable(mesh=mesh, value=temp_bc)
+temp = CellVariable(mesh=mesh, value=temp_bc, hasOld=True)
 
 # Species concentration, inert specie will not be solved for
 c = {name: CellVariable(name='c_' + name, mesh=mesh,
                         value=humid_air.gas.concentration[
-                            humid_air.species_id[name]])
+                            humid_air.species_id[name]], hasOld=True)
      for name in solution_species}
 # Species mole fractions, including inert specie
 x = {name: CellVariable(name='x_' + name, mesh=mesh,
@@ -244,9 +244,11 @@ s_min = s_chl
 iter_max = numerical_dict["maximum_iterations"]
 iter_min = numerical_dict["minimum_iterations"]
 error_tol = numerical_dict["error_tolerance"]
-urf_temp = numerical_dict["under_relaxation_factor"]["temperature"]
-urf_sat = numerical_dict["under_relaxation_factor"]["saturation"]
-urf_array = hf.make_urf_array(urf_sat)
+urf_dict = numerical_dict["under_relaxation_factor"]
+# urf_sat = urf_dict["saturation"]
+urf_array_dict = {key: hf.make_urf_array(value, iter_max)
+                  for key, value in urf_dict.items()}
+# urf_array = hf.make_urf_array(urf_sat, iter_max)
 
 s_value = np.ones(s.value.shape) * 0.1 #s_chl
 s.setValue(s_value)
@@ -271,8 +273,7 @@ while True:
               ''.format(iter_count, residual))
         break
 
-    if urf_array is not None:
-        urf_sat = urf_array[iter_count]
+    urf = {key: value[iter_count] for key, value in urf_array_dict.items()}
 
     # Calculate inert specie
     c_array = np.zeros((humid_air.n_species, n_cells))
@@ -312,6 +313,7 @@ while True:
             saturation=sat, temperature=t, pressure=p,
             capillary_pressure=p_cap, porosity=porosity)
         specific_area = interfacial_area / mesh.cellVolumes
+        # specific_area = 1.0
         volumetric_evap_rate = specific_area * evaporation_rate
         src_p.setValue(-volumetric_evap_rate)
         # src_p.setValue(np.ones(s.value.shape) * 100.0)
@@ -321,17 +323,20 @@ while True:
         evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
 
         src_t_value_new = - volumetric_evap_rate * evap_enthalpy
-        src_t_value = urf_temp * src_t_value_new \
-            + (1.0 - urf_temp) * src_t_value_old
-        src_t.setValue(src_t_value)
-        src_t_value_old = np.copy(src_t_value)
-
+        # src_t_value = urf['temperature'] * src_t_value_new \
+        #     + (1.0 - urf['temperature']) * src_t_value_old
+        src_t.setValue(src_t_value_new)
+        # src_t_value_old = np.copy(src_t_value)
 
     # Solve Transport equations
-    residual_p = eq_p.sweep(var=p_liq)  # , underRelaxation=urfs[i])
-    residual_t = eq_t.sweep(var=temp)
+    residual_p = \
+        eq_p.sweep(var=p_liq, underRelaxation=urf.get('pressure', 1.0))
+    residual_t = \
+        eq_t.sweep(var=temp, underRelaxation=urf.get('temperature', 1.0))
     # residual_t = 0.0
-    residual_c = [eq_c[name].sweep(var=c[name]) for name in solution_species]
+    residual_c = \
+        [eq_c[name].sweep(var=c[name], underRelaxation=urf['concentration'])
+         for name in solution_species]
     for name in solution_species:
         c_value = c[name].value
         c_value[c_value < const.SMALL] = const.SMALL
@@ -343,10 +348,10 @@ while True:
     p_cap[:] = p_cap_new
 
     p_cap_min = saturation_model.calc_capillary_pressure(
-        s_min,  surface_tension=np.min(humid_air.surface_tension),
+        s_min, surface_tension=np.min(humid_air.surface_tension),
         humidity=np.max(humid_air.humidity))
     p_cap_max = saturation_model.calc_capillary_pressure(
-        0.99,  surface_tension=np.max(humid_air.surface_tension),
+        0.99, surface_tension=np.max(humid_air.surface_tension),
         humidity=np.min(humid_air.humidity))
     p_cap[p_cap < p_cap_min] = p_cap_min
     p_cap[p_cap > p_cap_max] = p_cap_max
@@ -356,7 +361,7 @@ while True:
     s_new = saturation_model.calc_saturation(p_cap)
     # s_new = saturation_model.calc_saturation(p_cap, humid_air.humidity)
 
-    s_value = urf_sat * s_new + (1.0 - urf_sat) * s_old
+    s_value = urf['saturation'] * s_new + (1.0 - urf['saturation']) * s_old
     s_value[s_value < s_min] = s_min
     s.setValue(s_value)
 
@@ -381,25 +386,25 @@ for name in humid_air.species_names:
     x[name].setValue(humid_air.gas.mole_fraction[humid_air.species_id[name]])
 
 if __name__ == '__main__':
-    # viewer = Viewer(vars=p_liq)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Liquid pressure. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Saturation. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=src_p)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Condensation rate. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("Temperature. Press <return> to proceed...")
-    #
-    # viewer = Viewer(vars=x['O2'])  # , datamin=0., datamax=1.)
-    # viewer.plot()
-    # input("O2 Mole Fraction. Press <return> to proceed...")
+    viewer = Viewer(vars=p_liq)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Liquid pressure. Press <return> to proceed...")
+
+    viewer = Viewer(vars=s)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Saturation. Press <return> to proceed...")
+
+    viewer = Viewer(vars=src_p)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Condensation rate. Press <return> to proceed...")
+
+    viewer = Viewer(vars=temp)  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("Temperature. Press <return> to proceed...")
+
+    viewer = Viewer(vars=x['O2'])  # , datamin=0., datamax=1.)
+    viewer.plot()
+    input("O2 Mole Fraction. Press <return> to proceed...")
 
     fig, ax = plt.subplots()
     ax.plot(list(range(len(residuals))), np.asarray(residuals))

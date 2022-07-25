@@ -1,6 +1,7 @@
 import numpy as np
 
-def make_urf_array(urf):
+
+def make_urf_array(urf, iter_max):
     if isinstance(urf, (list, tuple)):
         urf_array = np.asarray(urf)
         n_start = 0
@@ -15,7 +16,14 @@ def make_urf_array(urf):
 
         # urf_ids = [n for m in urf_id_list for n in m]
         urf_array = np.concatenate(urf_value_list, axis=0)
+
+        if iter_max > n_end:
+            n_ext = iter_max - n_end
+            urf_array = np.concatenate(
+                (urf_array, np.ones(n_ext) * urf_array[-1]), axis=0)
         # urf_list = urf_values]
+    elif isinstance(urf, float):
+        urf_array = np.ones(iter_max) * urf
     else:
         urf_array = None
     return urf_array

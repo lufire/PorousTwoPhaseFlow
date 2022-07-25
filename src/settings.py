@@ -1,13 +1,13 @@
 boundary_conditions = \
     {
-        'avg_current_density': 7500.0,
+        'avg_current_density': 20000.0,
         'operating_voltage': 0.8,
         'channel_temperature': 343.15,
         'channel_humidity': 1.0,
         'oxygen_fraction': 1.0,
         'gdl_channel_saturation': 0.001,
         'channel_pressure': 101325.0,
-        'cl_gdl_liquid_water_fraction': 1.0,
+        'cl_gdl_liquid_water_fraction': 0.0,
         'cathode_heat_flux_fraction': 0.7
     }
 
@@ -54,7 +54,7 @@ porous_dict = \
         "saturation_model":
             {  # "leverett", "psd", "imbibition_drainage",
                 # "gostick_correlation", "data_table", or "psd"
-                "type": "data_table",
+                "type": "leverett",
                 "leverett":
                     {
                         "type": "leverett",
@@ -148,7 +148,9 @@ numerical_dict = \
         "maximum_iterations": 100,
         "error_tolerance": 1e-7,
         "under_relaxation_factor":
-            {"saturation": [[500, 1000], [0.2, 0.01]],
-             "temperature": 0.001}
+            {"saturation": [[500, 1000], [0.3, 0.1]],
+             "temperature": 1.0,
+             "concentration": 1.0,
+             "pressure": 0.5}
     }
 
