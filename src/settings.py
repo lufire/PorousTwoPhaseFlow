@@ -45,7 +45,7 @@ porous_dict = \
         "name": "Cathode GDL",
         "type": "CarbonPaper",
         "thickness": 200e-6,
-        "porosity": 0.6,
+        "porosity": 0.8,
         "bruggemann_coefficient": 1.5,
         "permeability": (1.0e-12, 1.0e-12, 1.0e-12),
         "thermal_conductivity": (28.4, 2.8),
@@ -67,7 +67,7 @@ porous_dict = \
                         "F": [0.08, 0.92],  # [F_HI, F_HO]
                         "f": [[0.28, 0.72], [0.28, 0.72]],
                         "s": [[0.35, 1.0], [0.35, 1.0]],
-                        "contact_angle": [80.0, 120.0]  # [theta_HI, theta_HO]
+                        "contact_angle": [80.0, 120.0]
                     },
                 "imbibition_drainage":
                     {  # "leverett" or "psd"
@@ -78,7 +78,7 @@ porous_dict = \
                                 "maximum_water_saturation": 0.99,
                                 "residual_water_saturation": 0.1,
                                 "f": [0.25, 0.75],
-                                "m": [250, 200],  # [F_HI, F_HO]
+                                "m": [250, 200],
                                 "n": [0.4, 0.5],
                                 "P_C_b": [101500.0, 107500.0]
                             },
@@ -88,7 +88,7 @@ porous_dict = \
                                 "maximum_water_saturation": 0.99,
                                 "residual_water_saturation": 0.1,
                                 "f": [1.0],
-                                "m": [150],  # [F_HI, F_HO]
+                                "m": [150],
                                 "n": [1.0],
                                 "P_C_b": [105000.0]
                             }
@@ -99,7 +99,7 @@ porous_dict = \
                         "maximum_saturation": 1.0,
                         "residual_saturation": 0.0,
                         "f": [0.25, 0.75],
-                        "m": [250, 200],  # [F_HI, F_HO]
+                        "m": [250, 200],
                         "n": [0.3, 0.5],
                         "P_C_b": [101500.0, 108000.0]
                     },
