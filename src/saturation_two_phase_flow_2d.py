@@ -153,12 +153,12 @@ p_liq = CellVariable(name="Liquid pressure",
 s = CellVariable(mesh=mesh, value=s_min, hasOld=True)
 
 # Temperature
-temp = CellVariable(mesh=mesh, value=temp_bc)
+temp = CellVariable(mesh=mesh, value=temp_bc, hasOld=True)
 
 # Species concentration, inert specie will not be solved for
 c = {name: CellVariable(name='c_' + name, mesh=mesh,
                         value=humid_air.gas.concentration[
-                            humid_air.species_id[name]])
+                            humid_air.species_id[name]], hasOld=True)
      for name in solution_species}
 # Species mole fractions, including inert specie
 x = {name: CellVariable(name='x_' + name, mesh=mesh,
@@ -236,10 +236,12 @@ s_min = s_chl
 iter_max = numerical_dict["maximum_iterations"]
 iter_min = numerical_dict["minimum_iterations"]
 error_tol = numerical_dict["error_tolerance"]
-urf = numerical_dict["under_relaxation_factor"]
-urf_array = hf.make_urf_array(urf)
+urf_dict = numerical_dict["under_relaxation_factor"]
+# urf_sat = urf_dict["saturation"]
+urf_array_dict = {key: hf.make_urf_array(value, iter_max)
+                  for key, value in urf_dict.items()}
 
-s_value = np.ones(s.value.shape) * 0.1 #s_chl
+s_value = np.ones(s.value.shape) * 0.1  # s_chl
 s.setValue(s_value)
 s_old = np.copy(s_value)
 p_cap = np.zeros(s_value.shape)  # * 1000.0
@@ -262,8 +264,7 @@ while True:
               ''.format(iter_count, residual))
         break
 
-    if urf_array is not None:
-        urf = urf_array[iter_count]
+    urf = {key: value[iter_count] for key, value in urf_array_dict.items()}
 
     # Calculate inert specie
     c_array = np.zeros((humid_air.n_species, n_cells))
@@ -286,12 +287,12 @@ while True:
 
     # Update diffusion coefficients
     # Saturation transport coefficient
-    # dpc_ds = 22.95
     time_0 = time_1
     time_1 = time.time()
     # print('initial section: '.format(iter_count), time_1 - time_0)
 
-    dpc_ds = saturation_model.calc_gradient(s)
+    dpc_ds = 22.95
+    # dpc_ds = saturation_model.calc_gradient(s)
 
     time_0 = time_1
     time_1 = time.time()
@@ -318,9 +319,8 @@ while True:
         src_s.setValue(-volumetric_evap_rate / water_mw)
         # src_s.setValue(np.ones(s.value.shape) * 100.0)
         name_pc = humid_air.species_names[humid_air.id_pc]
-        mw_pc = humid_air.species_mw[humid_air.id_pc]
-        src_c[name_pc].setValue(volumetric_evap_rate / mw_pc)
-        evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / mw_pc
+        src_c[name_pc].setValue(volumetric_evap_rate / water_mw)
+        evap_enthalpy = humid_air.calc_vaporization_enthalpy(t) / water_mw
         src_t.setValue(-volumetric_evap_rate * evap_enthalpy)
 
     time_0 = time_1
@@ -328,10 +328,14 @@ while True:
     # print('source term calculation: '.format(iter_count), time_1 - time_0)
 
     # Solve Transport equations
-    residual_s = eq_s.sweep(var=s)  # , underRelaxation=urfs[i])
-    residual_t = eq_t.sweep(var=temp)
+    residual_s = eq_s.sweep(var=s, underRelaxation=urf.get('pressure', None))  # , underRelaxation=urfs[i])
+    residual_t = \
+        eq_t.sweep(var=temp, underRelaxation=urf.get('temperature', None))
     # residual_t = 0.0
-    residual_c = [eq_c[name].sweep(var=c[name]) for name in solution_species]
+    residual_c = \
+        [eq_c[name].sweep(var=c[name],
+                          underRelaxation=urf.get('concentration', None))
+         for name in solution_species]
     for name in solution_species:
         c_value = c[name].value
         c_value[c_value < const.SMALL] = const.SMALL
@@ -340,37 +344,45 @@ while True:
     time_1 = time.time()
     # print('solve equations: '.format(iter_count), time_1 - time_0)
     # Calculate new saturation values using under-relaxation
-    s_old = np.copy(s.value)
-    s_new = saturation_model.calc_saturation(p_cap, sigma)
-    s_value = urf * s_new + (1.0 - urf) * s_old
+    # s_old = np.copy(s.value)
+    # s_new = saturation_model.calc_saturation(p_cap, sigma)
+    s_value = s.value
+
+    urf_sat = urf.get('saturation', 1.0)
+    s_value = urf_sat * s_value + (1.0 - urf_sat) * s_old
+
     s_value[s_value < s_min] = s_min
     s_value[s_value > 1.0] = 1.0
+
+    s_old = np.copy(s.value)
     s.setValue(s_value)
 
     # Save old capillary pressure
-    p_cap_old = np.copy(p_cap)
-    # Calculate and constrain capillary pressure
-    p_cap[:] = saturation_model.calc_capillary_pressure(s.value)
-
-    p_cap_min = saturation_model.calc_capillary_pressure(
-        s_min,  surface_tension=np.min(humid_air.surface_tension),
-        humidity=np.max(humid_air.humidity))
-    p_cap_max = saturation_model.calc_capillary_pressure(
-        0.99,  surface_tension=np.max(humid_air.surface_tension),
-        humidity=np.min(humid_air.humidity))
-    p_cap[p_cap < p_cap_min] = p_cap_min
-    p_cap[p_cap > p_cap_max] = p_cap_max
-
-    p_liq.setValue(p_cap + p_gas)
+    # p_cap_old = np.copy(p_cap)
+    # # Calculate and constrain capillary pressure
+    # p_cap[:] = saturation_model.calc_capillary_pressure(s.value)
+    #
+    # p_cap_min = saturation_model.calc_capillary_pressure(
+    #     s_min,  surface_tension=np.min(humid_air.surface_tension),
+    #     humidity=np.max(humid_air.humidity))
+    # p_cap_max = saturation_model.calc_capillary_pressure(
+    #     0.99,  surface_tension=np.max(humid_air.surface_tension),
+    #     humidity=np.min(humid_air.humidity))
+    # p_cap[p_cap < p_cap_min] = p_cap_min
+    # p_cap[p_cap > p_cap_max] = p_cap_max
+    #
+    # p_liq.setValue(p_cap + p_gas)
 
     s_diff = s_value - s_old
     s_diff[:] = np.divide(s_diff, s_value, where=s_value != 0.0)
-    p_diff = p_cap - p_cap_old
-    p_diff[:] = np.divide(p_diff, p_cap, where=p_cap != 0.0)
+    # p_diff = p_cap - p_cap_old
+    # p_diff[:] = np.divide(p_diff, p_cap, where=p_cap != 0.0)
     eps_s = np.dot(s_diff.transpose(), s_diff) / (2.0 * len(s_diff))
-    eps_p = np.dot(p_diff.transpose(), p_diff) / (2.0 * len(p_diff))
+    # eps_p = np.dot(p_diff.transpose(), p_diff) / (2.0 * len(p_diff))
 
-    eps = eps_s + eps_p
+    # eps = eps_s + eps_p
+    # eps = eps_p
+    eps = 0.0
     residual = residual_t + residual_s + np.sum(residual_c) + eps
 
     # Update iteration counter

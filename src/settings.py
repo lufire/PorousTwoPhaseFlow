@@ -1,13 +1,13 @@
 boundary_conditions = \
     {
         'avg_current_density': 20000.0,
-        'operating_voltage': 0.8,
+        'operating_voltage': 0.5,
         'channel_temperature': 343.15,
         'channel_humidity': 1.0,
         'oxygen_fraction': 1.0,
         'gdl_channel_saturation': 0.001,
         'channel_pressure': 101325.0,
-        'cl_gdl_liquid_water_fraction': 0.0,
+        'cl_gdl_liquid_water_fraction': 1.0,
         'cathode_heat_flux_fraction': 0.7
     }
 
@@ -88,7 +88,9 @@ porous_dict = \
                                 "f": [0.25, 0.75],
                                 "m": [250, 200],
                                 "n": [0.4, 0.5],
-                                "P_C_b": [101500.0, 107500.0]
+                                "P_C_b": [101500.0, 107500.0],
+                                "precalculate_pressure": True,
+                                "precalculate_gradient": True
                             },
                         "drainage_model":
                             {
@@ -98,7 +100,9 @@ porous_dict = \
                                 "f": [1.0],
                                 "m": [150],
                                 "n": [1.0],
-                                "P_C_b": [105000.0]
+                                "P_C_b": [105000.0],
+                                "precalculate_pressure": True,
+                                "precalculate_gradient": True
                             }
                     },
                 "gostick_correlation":
@@ -110,6 +114,15 @@ porous_dict = \
                         "m": [250, 200],
                         "n": [0.3, 0.5],
                         "P_C_b": [101500.0, 108000.0]
+                        # "type": "gostick_correlation",
+                        # "maximum_water_saturation": 0.99,
+                        # "residual_water_saturation": 0.1,
+                        # "f": [1.0],
+                        # "m": [150],
+                        # "n": [1.0],
+                        # "P_C_b": [105000.0],
+                        # "precalculate_pressure": True,
+                        # "precalculate_gradient": True
                     },
             }
     }
@@ -145,12 +158,14 @@ electrode_dict = \
 numerical_dict = \
     {
         "minimum_iterations": 10,
-        "maximum_iterations": 100,
+        "maximum_iterations": 500,
         "error_tolerance": 1e-7,
         "under_relaxation_factor":
-            {"saturation": [[500, 1000], [0.3, 0.1]],
-             "temperature": 1.0,
-             "concentration": 1.0,
-             "pressure": 0.5}
+            {
+                "saturation": [[500, 1000], [0.3, 0.1]],
+                "temperature": 0.95,
+                "concentration": 0.95,
+                "pressure": 0.95
+             }
     }
 

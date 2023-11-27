@@ -68,7 +68,7 @@ width = domain['width']
 porosity = porous_dict['porosity']
 permeability_abs = porous_dict['permeability'][0]
 thermal_conductivity_eff = \
-    np.asarray(porous_dict['thermal_conductivity']) * porosity
+    np.asarray(porous_dict['thermal_conductivity']) * (1.0 - porosity)
 
 # Numerical resolution
 nx = domain['nx']
@@ -115,7 +115,7 @@ name_inert = humid_air.species_names[id_inert]
 # Constant factor for saturation "diffusion" coefficient
 # D_s_const = rho_water / mu_water * permeability_abs
 D_s_const = humid_air.liquid.density * permeability_abs \
-            / (humid_air.liquid.viscosity) #  * water_mw)
+            / humid_air.liquid.viscosity  # * water_mw)
 
 # Initialize mesh variables
 # Saturation diffusion coefficient
@@ -178,7 +178,7 @@ facesBottom = mesh.facesBottom
 facesBottomLeft = (facesBottom & (X < L / 2.0))
 facesBottomRight = (facesBottom & (X >= L / 2.0))
 
-distribution = 0.5
+distribution = 0.0
 face_weights = facesBottomLeft * (1.0 + distribution) \
                + facesBottomRight * (1.0 - distribution)
 bc_current_density = face_weights * avg_current_density
@@ -312,8 +312,8 @@ while True:
         evaporation_rate = evap_model.calc_evaporation_rate(
             saturation=sat, temperature=t, pressure=p,
             capillary_pressure=p_cap, porosity=porosity)
-        specific_area = interfacial_area / mesh.cellVolumes
-        # specific_area = 1.0
+        # specific_area = interfacial_area / mesh.cellVolumes
+        specific_area = 1.0
         volumetric_evap_rate = specific_area * evaporation_rate
         src_p.setValue(-volumetric_evap_rate)
         # src_p.setValue(np.ones(s.value.shape) * 100.0)
@@ -330,12 +330,13 @@ while True:
 
     # Solve Transport equations
     residual_p = \
-        eq_p.sweep(var=p_liq, underRelaxation=urf.get('pressure', 1.0))
+        eq_p.sweep(var=p_liq, underRelaxation=urf.get('pressure', None))
     residual_t = \
-        eq_t.sweep(var=temp, underRelaxation=urf.get('temperature', 1.0))
+        eq_t.sweep(var=temp, underRelaxation=urf.get('temperature', None))
     # residual_t = 0.0
     residual_c = \
-        [eq_c[name].sweep(var=c[name], underRelaxation=urf['concentration'])
+        [eq_c[name].sweep(var=c[name],
+                          underRelaxation=urf.get('concentration', None))
          for name in solution_species]
     for name in solution_species:
         c_value = c[name].value
@@ -361,8 +362,13 @@ while True:
     s_new = saturation_model.calc_saturation(p_cap)
     # s_new = saturation_model.calc_saturation(p_cap, humid_air.humidity)
 
-    s_value = urf['saturation'] * s_new + (1.0 - urf['saturation']) * s_old
+    urf_sat = urf.get('saturation', 1.0)
+    s_value = urf_sat * s_new + (1.0 - urf_sat) * s_old
+
     s_value[s_value < s_min] = s_min
+    s_value[s_value > 1.0] = 1.0
+
+    s_old = np.copy(s.value)
     s.setValue(s_value)
 
     s_diff = s_value - s_old
