@@ -3,4 +3,5 @@ scipy>=1.7.3
 matplotlib
 fipy
 cantera
+setuptools
 git+https://github.com/ZBT-Tools/pemfc-core.git@master
