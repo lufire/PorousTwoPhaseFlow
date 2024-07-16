@@ -13,7 +13,7 @@ from scipy.sparse.linalg import spsolve
 from scipy import interpolate
 # import sympy as sy
 from matplotlib import pyplot as plt
-import saturation as sat
+from porous_two_phase_flow import saturation_functions as sat
 # import analytic_leverett as al
 
 # s = sy.symbols('s')

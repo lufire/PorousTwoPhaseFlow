@@ -1,5 +1,6 @@
 numpy>=1.22.1
 scipy>=1.7.3
+matplotlib
 fipy
 cantera
-git+https://github.com/ZBT-Tools/pemfc-core.git@fluid_extension
+git+https://github.com/ZBT-Tools/pemfc-core.git@master

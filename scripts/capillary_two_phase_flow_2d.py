@@ -12,18 +12,17 @@ from fipy import CellVariable, FaceVariable, Grid2D, Viewer, \
     TransientTerm, DiffusionTerm, input
 from fipy.tools import numerix
 import fipy as fp
-import saturation as sat
-import matplotlib
-import pemfc
+import porous_two_phase_flow.saturation as sat
+
 from pemfc import constants
-import constants as const
+from porous_two_phase_flow import constants as const
 from pemfc.src.fluid import fluid
 from pemfc.src.fluid import diffusion_model
 from pemfc.src.fluid import evaporation_model
-import porous_layer as pl
+from porous_two_phase_flow import porous_layer as pl
 from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
     electrode_dict, evaporation_dict, numerical_dict
-import helper_functions as hf
+from porous_two_phase_flow import helper_functions as hf
 # matplotlib.use('TkAgg')
 
 # Physical boundary conditions and parameters
@@ -94,7 +93,7 @@ fluid_dict['components']['O2']['molar_fraction'] = \
     fluid_dict['components']['O2']['molar_fraction'] * f_O2
 fluid_dict['components']['N2']['molar_fraction'] = \
     1.0 - fluid_dict['components']['O2']['molar_fraction']
-humid_air = fluid.factory(fluid_dict, backend='pemfc')
+humid_air = fluid.create(fluid_dict, backend='pemfc')
 humid_air.update()
 
 # Initialize porous layer

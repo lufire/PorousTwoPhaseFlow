@@ -1,6 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from src import saturation_model as sm
+from . import saturation_model as sm
 
 
 class PorousLayer(ABC):

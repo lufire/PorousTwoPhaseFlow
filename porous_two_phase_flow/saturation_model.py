@@ -4,13 +4,13 @@ from scipy import special
 from scipy import optimize
 from scipy.interpolate import interp1d
 from abc import ABC, abstractmethod
-from src.constants import SQRT_2
-import porous_layer as pl
+from .constants import SQRT_2
+from . import porous_layer as pl
 
 
 class SaturationModel(ABC):
 
-    def __new__(cls, model_dict, porous_layer, fluid):
+    def __new__(cls, model_dict, porous_layer, fluid: fl.TwoPhaseMixture):
         if not isinstance(porous_layer, pl.PorousTwoPhaseLayer):
             raise TypeError('porous_layer must be of type PorousTwoPhaseLayer')
         if not isinstance(fluid, fl.TwoPhaseMixture):
