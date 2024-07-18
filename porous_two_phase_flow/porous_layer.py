@@ -14,6 +14,8 @@ class PorousLayer(ABC):
             raise NotImplementedError
 
     def __init__(self, model_dict, fluid):
+        self.porosity = model_dict['porosity']
+        self.permeability = model_dict['permeability']
         self.dict = model_dict
         self.model_type = model_dict['type']
 
@@ -26,8 +28,7 @@ class PorousLayer(ABC):
 class PorousTwoPhaseLayer(PorousLayer, ABC):
     def __init__(self, model_dict, fluid):
         super().__init__(model_dict, fluid)
-        self.porosity = model_dict['porosity']
-        self.permeability = model_dict['permeability']
+
         self.n_rel = model_dict.get('relative_permeability_exponent', 3.0)
         self.saturation_model_type = model_dict['saturation_model']['type']
         self.saturation_model = \

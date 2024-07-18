@@ -184,9 +184,8 @@ bc_heat_flux = face_weights * avg_heat_flux
 # Boundary conditions for liquid pressure
 sigma_water_bc = humid_air.phase_change_species.calc_surface_tension(temp_bc)[0]
 p_capillary_top = \
-    saturation_model.calc_capillary_pressure(s_chl,
-                                             surface_tension=sigma_water_bc,
-                                             humidity=h_chl)
+    saturation_model.calc_capillary_pressure(
+        s_chl, surface_tension=sigma_water_bc, humidity=h_chl)
 
 p_liquid_top = p_capillary_top + p_gas
 p_liq.setValue(p_liquid_top)
