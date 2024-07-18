@@ -10,9 +10,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 from fipy import CellVariable, FaceVariable, Grid2D, Viewer, \
     TransientTerm, DiffusionTerm, input
-from fipy.tools import numerix
-import fipy as fp
-import porous_two_phase_flow.saturation as sat
 
 from pemfc import constants
 from porous_two_phase_flow import constants as const
@@ -103,7 +100,7 @@ porous_layer = pl.PorousTwoPhaseLayer(porous_dict, humid_air)
 saturation_model = porous_layer.saturation_model
 
 # Initialize evaporation model
-evap_model = evaporation_model.EvaporationModel(humid_air, evaporation_dict)
+evap_model = evaporation_model.EvaporationModel(evaporation_dict, humid_air)
 
 water_id = humid_air.species_id['H2O']
 water_mw = humid_air.species.mw[water_id]

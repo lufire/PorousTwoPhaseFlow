@@ -13,7 +13,13 @@ class SaturationModel(ABC):
     def __new__(cls, model_dict, porous_layer, fluid: fl.TwoPhaseMixture):
         if not isinstance(porous_layer, pl.PorousTwoPhaseLayer):
             raise TypeError('porous_layer must be of type PorousTwoPhaseLayer')
-        if not isinstance(fluid, fl.TwoPhaseMixture):
+        # TODO: isinstance check fails because the same type, however
+        #  separately imported. Possible solution is to make fluid an
+        #  independent package. As a temporary solution, the type checking
+        #  will be done differently
+        # if not isinstance(fluid, fl.TwoPhaseMixture):
+        #     raise TypeError('fluid must be of type TwoPhaseMixture')
+        if not all(hasattr(fluid, attr) for attr in ["liquid", "gas"]):
             raise TypeError('fluid must be of type TwoPhaseMixture')
 
         model_type = model_dict.get('type', 'leverett')
