@@ -11,10 +11,10 @@ from matplotlib import pyplot as plt
 from fipy import CellVariable, FaceVariable, Grid2D, Viewer, \
     TransientTerm, DiffusionTerm, input
 
-from pemfc import constants
+from pemfc.src import constants
 from porous_two_phase_flow import constants as const
 from pemfc.src.fluid import fluid
-from pemfc.src.fluid import diffusion_model
+from pemfc.src.fluid import diffusion_coefficient
 from pemfc.src.fluid import evaporation_model
 from porous_two_phase_flow import porous_layer as pl
 from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
@@ -124,7 +124,7 @@ solution_species = [name for i, name in enumerate(humid_air.species_names)
 solve_species = \
     dict(zip(humid_air.species_names,
              [item in solution_species for item in humid_air.species_names]))
-diff_model = diffusion_model.MixtureAveragedDiffusionModel(humid_air.gas)
+diff_model = diffusion_coefficient.MixtureAveragedDiffusionCoefficient(humid_air.gas)
 diff_model.update(humid_air.temperature, humid_air.pressure,
                   humid_air.mole_fraction, update_names=solution_species)
 D_c = {name: CellVariable(mesh=mesh,

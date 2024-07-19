@@ -133,9 +133,10 @@ class LeverettModel(SaturationModel):
                      saturation_prev=None):
         factor = - surface_tension * np.cos(self.contact_angle_rad) \
             * np.sqrt(self.porosity / self.permeability)
-
+        capillary_pressure = np.copy(capillary_pressure)
         min_pressure = self.leverett_p_s(self.s_min, np.min(surface_tension))
         max_pressure = self.leverett_p_s(1.0, np.max(surface_tension))
+
         capillary_pressure[capillary_pressure < min_pressure] = min_pressure
         capillary_pressure[capillary_pressure > max_pressure] = max_pressure
 
