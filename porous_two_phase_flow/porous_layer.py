@@ -35,9 +35,12 @@ class PorousTwoPhaseLayer(PorousLayer, ABC):
             sm.SaturationModel(
                 model_dict['saturation_model'][self.saturation_model_type],
                 self, fluid)
+        self.pore_radius = model_dict['pore_radius']
+        self.pore_volume = (2.0 * self.pore_radius) ** 3.0
+        self.pore_density = self.porosity / self.pore_volume  # 1 / m³
 
     @abstractmethod
-    def calc_two_phase_interfacial_area(self, saturation):
+    def calc_specific_interfacial_area(self, saturation):
         pass
 
     def calc_relative_permeability(self, saturation):
@@ -51,9 +54,7 @@ class CarbonPaper(PorousTwoPhaseLayer):
         super().__init__(model_dict, fluid)
         self.bruggemann_coeff = model_dict['bruggemann_coefficient']
         # self.contact_angle = model_dict['contact_angle']
-        self.pore_radius = model_dict['pore_radius']
         # pore volume base on cubic approximation
-        self.pore_volume = (2.0 * self.pore_radius) ** 3.0
 
     def calc_effective_property(self, transport_property, matrix_property=True):
         if matrix_property:
@@ -61,8 +62,12 @@ class CarbonPaper(PorousTwoPhaseLayer):
         else:
             return transport_property * self.porosity ** self.bruggemann_coeff
 
-    def calc_two_phase_interfacial_area(self, saturation):
+    def calc_specific_interfacial_area(self, saturation):
+        """
+        :param saturation: fraction of void volume filled with second phase
+        :return: specific interfacial area in m²/m³
+        """
         # Assuming single spherical droplet per pore
         radius_liquid = \
             (3.0 * self.pore_volume * saturation / (4.0 * np.pi)) ** (1.0 / 3.0)
-        return 4.0 * np.pi * radius_liquid ** 2.0
+        return 4.0 * np.pi * radius_liquid ** 2.0 * self.pore_density

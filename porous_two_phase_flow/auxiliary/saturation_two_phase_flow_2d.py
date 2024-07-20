@@ -308,7 +308,7 @@ while True:
 
     # Update source terms
     if True:  # residual <= 1e-1:
-        interfacial_area = porous_layer.calc_two_phase_interfacial_area(s.value)
+        interfacial_area = porous_layer.calc_specific_interfacial_area(s.value)
         # evaporation_rate = evap_model.calc_evaporation_rate(
         #     temperature=t, pressure=p, capillary_pressure=p_cap)
         evaporation_rate = evap_model.calc_evaporation_rate(
