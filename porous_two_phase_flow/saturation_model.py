@@ -23,6 +23,7 @@ class SaturationModel(ABC):
             raise TypeError('fluid must be of type TwoPhaseMixture')
 
         model_type = model_dict.get('type', 'leverett')
+        model_dict.update(model_dict[model_type])
         if model_type == 'leverett':
             return super(SaturationModel, cls).__new__(LeverettModel)
         elif model_type == 'psd':

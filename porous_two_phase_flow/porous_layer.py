@@ -33,7 +33,7 @@ class PorousTwoPhaseLayer(PorousLayer, ABC):
         self.saturation_model_type = model_dict['saturation_model']['type']
         self.saturation_model = \
             sm.SaturationModel(
-                model_dict['saturation_model'][self.saturation_model_type],
+                model_dict['saturation_model'],
                 self, fluid)
         self.pore_radius = model_dict['pore_radius']
         self.pore_volume = (2.0 * self.pore_radius) ** 3.0
@@ -68,6 +68,7 @@ class CarbonPaper(PorousTwoPhaseLayer):
         :return: specific interfacial area in m²/m³
         """
         # Assuming single spherical droplet per pore
-        radius_liquid = \
-            (3.0 * self.pore_volume * saturation / (4.0 * np.pi)) ** (1.0 / 3.0)
-        return 4.0 * np.pi * radius_liquid ** 2.0 * self.pore_density
+        droplet_volume = self.pore_volume * saturation
+        droplet_radius = \
+            (3.0 * droplet_volume / (4.0 * np.pi)) ** (1.0 / 3.0)
+        return 4.0 * np.pi * droplet_radius ** 2.0 * self.pore_density

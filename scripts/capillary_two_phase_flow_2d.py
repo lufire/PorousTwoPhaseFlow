@@ -301,14 +301,14 @@ while True:
 
     # Update source terms
     if True:  # residual <= 1e-1:
-        interfacial_area = porous_layer.calc_specific_interfacial_area(sat)
+        specific_area = porous_layer.calc_specific_interfacial_area(sat)
         # evaporation_rate = evap_model.calc_evaporation_rate(
         #     temperature=t, pressure=p, capillary_pressure=p_cap)
         evaporation_rate = evap_model.calc_evaporation_rate(
             saturation=sat, temperature=t, pressure=p,
             capillary_pressure=p_cap, porosity=porosity)
         # specific_area = interfacial_area / mesh.cellVolumes
-        specific_area = 1.0
+        # specific_area = 1.0
         volumetric_evap_rate = specific_area * evaporation_rate
         src_p.setValue(-volumetric_evap_rate)
         # src_p.setValue(np.ones(s.value.shape) * 100.0)
