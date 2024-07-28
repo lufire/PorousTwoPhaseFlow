@@ -374,9 +374,9 @@ class ImbibitionDrainageCurve(SaturationModel):
             saturation[saturation < self.s_min] = self.s_min
             saturation[saturation > 1.0] = 1.0
 
-        def root_saturation(capillary_pressure):
+        def root_saturation(pressure):
             return saturation - \
-                   self.calc_saturation(capillary_pressure)
+                   self.calc_saturation(pressure)
 
         if capillary_pressure_prev is not None:
             p_c_in = capillary_pressure_prev
