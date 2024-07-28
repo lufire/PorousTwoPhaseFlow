@@ -156,6 +156,7 @@ class LeverettModel(SaturationModel):
                         saturation_prev=None, **kwargs):
         surface_tension = kwargs.get('surface_tension',
                                      self.fluid.surface_tension)
+        surface_tension = surface_tension.reshape(capillary_pressure.shape)
         saturation = \
             self.leverett_s_p(capillary_pressure, surface_tension,
                               saturation_prev=saturation_prev)
