@@ -104,9 +104,11 @@ class LeverettModel(SaturationModel):
         super().__init__(model_dict, porous_layer, fluid)
 
     def calc_capillary_pressure(self, saturation, *args, **kwargs):
-        surface_tension = np.reshape(
-            kwargs.get('surface_tension', self.fluid.surface_tension),
-            saturation.shape, order='F')
+        surface_tension = kwargs.get('surface_tension',
+                                     self.fluid.surface_tension)
+        if isinstance(surface_tension, np.ndarray) and len(surface_tension) > 1:
+            surface_tension = surface_tension.reshape(
+                saturation.shape, order='F')
         return self.leverett_p_s(saturation, surface_tension)
 
     @staticmethod
@@ -157,8 +159,9 @@ class LeverettModel(SaturationModel):
                         saturation_prev=None, **kwargs):
         surface_tension = kwargs.get('surface_tension',
                                      self.fluid.surface_tension)
-        surface_tension = np.reshape(surface_tension, capillary_pressure.shape,
-                                     order='F')
+        if isinstance(surface_tension, np.ndarray) and len(surface_tension) > 1:
+            surface_tension = surface_tension.reshape(
+                capillary_pressure.shape, order='F')
         saturation = \
             self.leverett_s_p(capillary_pressure, surface_tension,
                               saturation_prev=saturation_prev)
