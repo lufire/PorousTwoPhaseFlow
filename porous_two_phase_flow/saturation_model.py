@@ -382,4 +382,8 @@ class ImbibitionDrainageCurve(SaturationModel):
             p_c_in = capillary_pressure_prev
         else:
             p_c_in = np.ones(np.asarray(saturation).shape)
-        return optimize.root(root_saturation, p_c_in).x
+        shape = p_c_in.shape
+        p_c_in_flat = p_c_in.ravel(order='F')
+        solution = optimize.root(root_saturation, p_c_in_flat).x
+        capillary_pressure = np.reshape(solution, shape, order='F')
+        return capillary_pressure
