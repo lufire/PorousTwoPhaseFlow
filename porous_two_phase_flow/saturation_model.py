@@ -104,8 +104,9 @@ class LeverettModel(SaturationModel):
         super().__init__(model_dict, porous_layer, fluid)
 
     def calc_capillary_pressure(self, saturation, *args, **kwargs):
-        surface_tension = kwargs.get('surface_tension',
-                                     self.fluid.surface_tension)
+        surface_tension = np.reshape(
+            kwargs.get('surface_tension', self.fluid.surface_tension),
+            saturation.shape, order='F')
         return self.leverett_p_s(saturation, surface_tension)
 
     @staticmethod
@@ -156,7 +157,8 @@ class LeverettModel(SaturationModel):
                         saturation_prev=None, **kwargs):
         surface_tension = kwargs.get('surface_tension',
                                      self.fluid.surface_tension)
-        surface_tension = surface_tension.reshape(capillary_pressure.shape)
+        surface_tension = np.reshape(surface_tension, capillary_pressure.shape,
+                                     order='F')
         saturation = \
             self.leverett_s_p(capillary_pressure, surface_tension,
                               saturation_prev=saturation_prev)
@@ -194,8 +196,9 @@ class PSDModel(SaturationModel):
                            critical_radius_hydrophobic])
 
     def calc_saturation(self, capillary_pressure, *args, **kwargs):
-        surface_tension = kwargs.get('surface_tension',
-                                     self.fluid.surface_tension)
+        surface_tension = np.reshape(
+            kwargs.get('surface_tension', self.fluid.surface_tension),
+            capillary_pressure.shape, order='F')
         critical_radius = self.get_critical_radius(capillary_pressure,
                                                    surface_tension)
         saturation = np.zeros(critical_radius.shape[-1])
@@ -358,7 +361,8 @@ class ImbibitionDrainageCurve(SaturationModel):
                                                         *args, **kwargs)
         sat_drain = self.drainage_model.calc_saturation(capillary_pressure,
                                                         *args, **kwargs)
-        humidity = kwargs.get('humidity', self.fluid.humidity)
+        humidity = np.reshape(kwargs.get('humidity', self.fluid.humidity),
+                              sat_imb.shape, order='F')
         sat = sat_imb * np.heaviside(1.0 - humidity, 0.0) \
             + sat_drain * np.heaviside(humidity - 1.0, 1.0)
         return sat
