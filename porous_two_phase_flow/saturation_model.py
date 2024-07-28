@@ -373,6 +373,7 @@ class ImbibitionDrainageCurve(SaturationModel):
         if isinstance(saturation, np.ndarray):
             saturation[saturation < self.s_min] = self.s_min
             saturation[saturation > 1.0] = 1.0
+        saturation = saturation.ravel(order='F')
 
         def root_saturation(pressure):
             return saturation - \
