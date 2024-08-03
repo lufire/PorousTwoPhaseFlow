@@ -17,6 +17,7 @@ from pemfc.src.fluid import fluid
 from pemfc.src.fluid import diffusion_coefficient
 from pemfc.src.fluid import evaporation_model
 from porous_two_phase_flow import porous_layer as pl
+from porous_two_phase_flow import saturation_model as sm
 from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
     electrode_dict, evaporation_dict, numerical_dict
 from porous_two_phase_flow import helper_functions as hf
@@ -94,10 +95,11 @@ humid_air = fluid.create(fluid_dict, backend='pemfc')
 humid_air.update()
 
 # Initialize porous layer
-porous_layer = pl.PorousTwoPhaseLayer(porous_dict, humid_air)
+porous_layer = pl.PorousTwoPhaseLayer(porous_dict)
 
-# Get saturation model
-saturation_model = porous_layer.saturation_model
+# Create saturation model
+saturation_model = sm.SaturationModel(porous_dict['saturation_model'],
+                                      porous_layer, humid_air)
 
 # Initialize evaporation model
 evap_model = evaporation_model.EvaporationModel(evaporation_dict, humid_air)
@@ -174,7 +176,7 @@ facesBottom = mesh.facesBottom
 facesBottomLeft = (facesBottom & (X < L / 2.0))
 facesBottomRight = (facesBottom & (X >= L / 2.0))
 
-distribution = 0.0
+distribution = 0.5
 face_weights = facesBottomLeft * (1.0 + distribution) \
                + facesBottomRight * (1.0 - distribution)
 bc_current_density = face_weights * avg_current_density
@@ -245,7 +247,7 @@ urf_array_dict = {key: hf.make_urf_array(value, iter_max)
                   for key, value in urf_dict.items()}
 # urf_array = hf.make_urf_array(urf_sat, iter_max)
 
-s_value = np.ones(s.value.shape) * 0.1 #s_chl
+s_value = np.ones(s.value.shape) * 0.001 #s_chl
 s.setValue(s_value)
 s_old = np.copy(s_value)
 p_cap = np.zeros(s_value.shape)  # * 1000.0
@@ -292,7 +294,7 @@ while True:
 
     # Update diffusion coefficients
     # Saturation transport coefficient
-    D_s.setValue(D_s_const * porous_layer.calc_relative_permeability(s))
+    D_s.setValue(D_s_const * porous_layer.calc_relative_permeability(sat))
     D_s_f.setValue(D_s.arithmeticFaceValue())
     # Concentration diffusion coefficients
     for name in solution_species:
@@ -301,14 +303,16 @@ while True:
 
     # Update source terms
     if True:  # residual <= 1e-1:
-        specific_area = porous_layer.calc_specific_interfacial_area(sat)
+        specific_area = porous_layer.calc_specific_interfacial_area(
+            sat, p_cap, saturation_model)
         # evaporation_rate = evap_model.calc_evaporation_rate(
         #     temperature=t, pressure=p, capillary_pressure=p_cap)
-        evaporation_rate = evap_model.calc_evaporation_rate(
+        evaporation_rate, _, _, _ = evap_model.calc_evaporation_rate(
             saturation=sat, temperature=t, pressure=p,
             capillary_pressure=p_cap, porosity=porosity)
         # specific_area = interfacial_area / mesh.cellVolumes
         # specific_area = 1.0
+        specific_area[specific_area > 5000.0] = 5000.0
         volumetric_evap_rate = specific_area * evaporation_rate
         src_p.setValue(-volumetric_evap_rate)
         # src_p.setValue(np.ones(s.value.shape) * 100.0)
