@@ -101,8 +101,9 @@ class CarbonPaper(PorousTwoPhaseLayer):
         # interfacial_area = (6.462 * 1.0 * (1.0 - s_w) ** 1.244 *
         #                     p_c ** -0.963)
 
-        p_c_max = saturation_model.calc_capillary_pressure(1.0)
+        p_c_max = saturation_model.calc_capillary_pressure(0.99)
         p_c = np.copy(capillary_pressure)
+        p_c[p_c > p_c_max] = p_c_max
         a1 = -1.6e-1
         a2 = 1.43e-5
         a3 = 1.91e-1
