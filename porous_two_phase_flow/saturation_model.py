@@ -185,6 +185,8 @@ class LeverettModel(SaturationModel):
                 surface_tension = surface_tension.ravel(order='F')
                 surface_tension = surface_tension.reshape(
                     capillary_pressure.shape, order='F')
+            else:
+                surface_tension = np.average(surface_tension)
         else:
             surface_tension = np.average(surface_tension)
         saturation = \
@@ -228,14 +230,16 @@ class PSDModel(SaturationModel):
                                      self.fluid.surface_tension)
         if isinstance(capillary_pressure, np.ndarray):
             if (isinstance(surface_tension, np.ndarray)
-                    and len(surface_tension) > 1):
+                    and surface_tension.size == capillary_pressure.size):
                 surface_tension = surface_tension.reshape(
                     capillary_pressure.shape, order='F')
+            else:
+                surface_tension = np.average(surface_tension)
         else:
             surface_tension = np.average(surface_tension)
         critical_radius = self.get_critical_radius(capillary_pressure,
                                                    surface_tension)
-        saturation = np.zeros(critical_radius.shape[-1])
+        saturation = np.zeros(capillary_pressure.shape)
         phi = [1, -1]
         for i in range(self.f.shape[0]):
             for j in range(self.f.shape[1]):
@@ -251,8 +255,10 @@ class PSDModel(SaturationModel):
                                 capillary_pressure_prev=None, **kwargs):
         saturation = np.copy(saturation)
         if isinstance(saturation, np.ndarray):
+            shape = saturation.shape
             saturation[saturation < self.s_min] = self.s_min
             saturation[saturation > 1.0] = 1.0
+            saturation = saturation.ravel(order='F')
 
         precalc_capillary_pressure = super().calc_capillary_pressure(saturation)
         if precalc_capillary_pressure is not None:
@@ -266,7 +272,8 @@ class PSDModel(SaturationModel):
             p_c_in = capillary_pressure_prev
         else:
             p_c_in = np.ones(np.asarray(saturation).shape)
-        return optimize.root(root_saturation_psd, p_c_in).x
+        solution = optimize.root(root_saturation_psd, p_c_in).x
+        return solution.reshape(shape, order='F')
 
 
 class GostickCorrelation(SaturationModel):
@@ -408,6 +415,8 @@ class ImbibitionDrainageCurve(SaturationModel):
                     and humidity.size == capillary_pressure.size):
                 humidity = humidity.reshape(
                     capillary_pressure.shape, order='F')
+            else:
+                humidity = np.average(humidity)
         else:
             humidity = np.average(humidity)
         sat = sat_imb * np.heaviside(1.0 - humidity, 0.0) \
