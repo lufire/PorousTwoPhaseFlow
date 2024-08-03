@@ -151,6 +151,9 @@ class LeverettModel(SaturationModel):
                      saturation_prev=None):
         factor = - surface_tension * np.cos(self.contact_angle_rad) \
             * np.sqrt(self.porosity / self.permeability)
+        if isinstance(factor, np.ndarray):
+            if factor.size != capillary_pressure.size:
+                factor = np.average(factor)
         capillary_pressure = np.copy(capillary_pressure)
         min_pressure = self.leverett_p_s(self.s_min, np.min(surface_tension))
         max_pressure = self.leverett_p_s(1.0, np.max(surface_tension))
@@ -165,7 +168,10 @@ class LeverettModel(SaturationModel):
             s_in = saturation_prev
         else:
             s_in = np.zeros(np.asarray(capillary_pressure).shape) + self.s_min
-        solution = optimize.newton(root_leverett_p_s, s_in)
+        try:
+            solution = optimize.newton(root_leverett_p_s, s_in)
+        except Exception:
+            raise ValueError
         saturation = solution
         return saturation
 
@@ -175,7 +181,8 @@ class LeverettModel(SaturationModel):
                                      self.fluid.surface_tension)
         if isinstance(capillary_pressure, np.ndarray):
             if (isinstance(surface_tension, np.ndarray)
-                    and len(surface_tension) > 1):
+                    and surface_tension.size == capillary_pressure.size):
+                surface_tension = surface_tension.ravel(order='F')
                 surface_tension = surface_tension.reshape(
                     capillary_pressure.shape, order='F')
         else:
@@ -398,7 +405,7 @@ class ImbibitionDrainageCurve(SaturationModel):
         humidity = kwargs.get('humidity', self.fluid.humidity)
         if isinstance(capillary_pressure, np.ndarray):
             if (isinstance(humidity, np.ndarray)
-                    and len(humidity) > 1):
+                    and humidity.size == capillary_pressure.size):
                 humidity = humidity.reshape(
                     capillary_pressure.shape, order='F')
         else:
@@ -411,9 +418,8 @@ class ImbibitionDrainageCurve(SaturationModel):
                                 **kwargs):
         if isinstance(saturation, np.ndarray):
             shape = saturation.shape
-            if isinstance(saturation, np.ndarray):
-                saturation[saturation < self.s_min] = self.s_min
-                saturation[saturation > 1.0] = 1.0
+            saturation[saturation < self.s_min] = self.s_min
+            saturation[saturation > 1.0] = 1.0
             saturation = saturation.ravel(order='F')
 
         def root_saturation(pressure):
@@ -425,7 +431,10 @@ class ImbibitionDrainageCurve(SaturationModel):
         else:
             p_c_in = np.ones(np.asarray(saturation).shape)
         p_c_in_flat = p_c_in.ravel(order='F')
+        # try:
         solution = optimize.root(root_saturation, p_c_in_flat).x
+        # except Exception:
+        #     raise ValueError
         capillary_pressure = np.reshape(solution, shape, order='F')
         return capillary_pressure
 
