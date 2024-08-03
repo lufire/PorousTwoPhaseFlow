@@ -409,12 +409,12 @@ class ImbibitionDrainageCurve(SaturationModel):
 
     def calc_capillary_pressure(self, saturation, capillary_pressure_prev=None,
                                 **kwargs):
-
-        shape = saturation.shape
         if isinstance(saturation, np.ndarray):
-            saturation[saturation < self.s_min] = self.s_min
-            saturation[saturation > 1.0] = 1.0
-        saturation = saturation.ravel(order='F')
+            shape = saturation.shape
+            if isinstance(saturation, np.ndarray):
+                saturation[saturation < self.s_min] = self.s_min
+                saturation[saturation > 1.0] = 1.0
+            saturation = saturation.ravel(order='F')
 
         def root_saturation(pressure):
             return saturation - \
