@@ -253,12 +253,11 @@ class PSDModel(SaturationModel):
 
     def calc_capillary_pressure(self, saturation,
                                 capillary_pressure_prev=None, **kwargs):
-        saturation = np.copy(saturation)
-        if isinstance(saturation, np.ndarray):
-            shape = saturation.shape
-            saturation[saturation < self.s_min] = self.s_min
-            saturation[saturation > 1.0] = 1.0
-            saturation = saturation.ravel(order='F')
+        saturation = np.array(saturation)
+        shape = saturation.shape
+        saturation[saturation < self.s_min] = self.s_min
+        saturation[saturation > 1.0] = 1.0
+        saturation = saturation.ravel(order='F')
 
         precalc_capillary_pressure = super().calc_capillary_pressure(saturation)
         if precalc_capillary_pressure is not None:
@@ -319,12 +318,13 @@ class GostickCorrelation(SaturationModel):
 
     def calc_capillary_pressure(self, saturation, capillary_pressure_prev=None,
                                 **kwargs):
-        saturation = np.copy(saturation)
-        if isinstance(saturation, np.ndarray):
-            s_min = self.s_w_r + 1e-3
-            s_max = self.s_w_m - 1e-3
-            saturation[saturation < s_min] = s_min
-            saturation[saturation > s_max] = s_max
+        saturation = np.copy(np.asarray(saturation))
+        shape = saturation.shape
+        s_min = self.s_w_r + 1e-3
+        s_max = self.s_w_m - 1e-3
+        saturation[saturation < s_min] = s_min
+        saturation[saturation > s_max] = s_max
+        saturation = saturation.ravel(order='F')
 
         precalc_capillary_pressure = super().calc_capillary_pressure(saturation)
         if precalc_capillary_pressure is not None:
@@ -339,7 +339,7 @@ class GostickCorrelation(SaturationModel):
         else:
             p_c_in = np.ones(np.asarray(saturation).shape)
         solution = optimize.root(root_saturation, p_c_in).x
-        return solution
+        return solution.reshape(shape, order='F')
 
 
 class DataTable(SaturationModel):

@@ -54,7 +54,7 @@ porous_dict = \
         "saturation_model":
             {  # "leverett", "psd", "imbibition_drainage",
                 # "gostick_correlation", "data_table", or "psd"
-                "type": "Leverett",
+                "type": "GostickCorrelation",
                 "Leverett":
                     {
                         "type": "Leverett",
@@ -107,13 +107,34 @@ porous_dict = \
                     },
                 "GostickCorrelation":
                     {
+                        # "type": "GostickCorrelation",
+                        # "maximum_saturation": 1.0,
+                        # "residual_saturation": 0.0,
+                        # "f": [0.25, 0.75],
+                        # "m": [250, 200],
+                        # "n": [0.3, 0.5],
+                        # "P_C_b": [101500.0, 108000.0]
                         "type": "GostickCorrelation",
-                        "maximum_saturation": 1.0,
+                        "maximum_saturation": 0.91,
                         "residual_saturation": 0.0,
-                        "f": [0.25, 0.75],
-                        "m": [250, 200],
-                        "n": [0.3, 0.5],
-                        "P_C_b": [101500.0, 108000.0]
+                        "f": [
+                            0.35,
+                            0.65
+                        ],
+                        "m": [
+                            200,
+                            150
+                        ],
+                        "n": [
+                            0.5,
+                            0.3
+                        ],
+                        "P_C_b": [
+                            101500.0,
+                            107500.0
+                        ],
+                        "precalculate_pressure": False,
+                        "precalculate_gradient": False
                         # "type": "gostick_correlation",
                         # "maximum_water_saturation": 0.99,
                         # "residual_water_saturation": 0.1,
@@ -163,7 +184,7 @@ numerical_dict = \
         "under_relaxation_factor":
             {
                 "saturation": [[500, 1000], [0.3, 0.1]],
-                "temperature": 0.95,
+                "temperature": 0.90,
                 "concentration": 0.95,
                 "pressure": 0.95
              }

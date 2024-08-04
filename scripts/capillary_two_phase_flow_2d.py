@@ -22,6 +22,8 @@ from settings import boundary_conditions, domain, fluid_dict, porous_dict, \
     electrode_dict, evaporation_dict, numerical_dict
 from porous_two_phase_flow import helper_functions as hf
 # matplotlib.use('TkAgg')
+np.set_printoptions(legacy="1.21")
+
 
 # Physical boundary conditions and parameters
 # Operating conditions
@@ -176,7 +178,7 @@ facesBottom = mesh.facesBottom
 facesBottomLeft = (facesBottom & (X < L / 2.0))
 facesBottomRight = (facesBottom & (X >= L / 2.0))
 
-distribution = 0.5
+distribution = 0.0
 face_weights = facesBottomLeft * (1.0 + distribution) \
                + facesBottomRight * (1.0 - distribution)
 bc_current_density = face_weights * avg_current_density
