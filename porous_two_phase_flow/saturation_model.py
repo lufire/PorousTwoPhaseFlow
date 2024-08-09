@@ -72,6 +72,31 @@ class SaturationModel(ABC):
         else:
             return None
 
+    def implicit_capillary_pressure(self, saturation,
+                                    capillary_pressure_prev=None, *args,
+                                    **kwargs):
+        saturation = np.copy(np.asarray(saturation))
+        shape = saturation.shape
+        saturation[saturation < self.s_min] = self.s_min
+        saturation[saturation > 1.0] = 1.0
+        saturation = saturation.ravel(order='F')
+
+        def root_saturation(pressure):
+            return saturation - \
+                self.calc_saturation(pressure)
+
+        if capillary_pressure_prev is not None:
+            p_c_in = capillary_pressure_prev
+        else:
+            p_c_in = np.ones(np.asarray(saturation).shape)
+        p_c_in_flat = p_c_in.ravel(order='F')
+        # try:
+        solution = optimize.root(root_saturation, p_c_in_flat).x
+        # except Exception:
+        #     raise ValueError
+        capillary_pressure = np.reshape(solution, shape, order='F')
+        return capillary_pressure
+
     @staticmethod
     def young_laplace(capillary_pressure, sigma, contact_angle):
         return - 1.0 * 2.0 * sigma * np.cos(contact_angle * np.pi / 180.0) \
@@ -450,31 +475,63 @@ class ImbibitionDrainageCurve(SaturationModel):
 
 class VanGenuchtenModel(SaturationModel):
     def __init__(self, model_dict, porous_layer, fluid=None):
-        self.p_d = model_dict['p_d']
+        self.s_r_n = model_dict.get('residual_non-wetting_saturation', 1.0)
+        self.s_r_w = model_dict.get('residual_wetting_saturation', 0.0)
+        self.alpha = model_dict['alpha']
         self.m = model_dict['m']
+        self.n = model_dict['n']
         # self.gamma = model_dict['gamma']
         super().__init__(model_dict, porous_layer, fluid=fluid)
 
-    def calc_capillary_pressure(self, saturation, *args, **kwargs):
-        p_c = self.p_d * (
-                (1.0 - saturation) ** (- 1.0 / self.m) - 1.0) ** (1.0 - self.m)
+    def calc_capillary_pressure(self, saturation, wetting=True,
+                                capillary_pressure_prev=None, *args, **kwargs):
+        if wetting:
+            s_w = np.copy(saturation)
+        else:
+            s_w = 1.0 - saturation
+        s_w[s_w < self.s_r_w] = self.s_r_w
+        s_w_max = 1.0 - self.s_r_n
+        s_w[s_w > s_w_max] = s_w_max
+        s_e = (s_w - self.s_r_w)/(1.0 - self.s_r_w - self.s_r_n)
+        s_e[s_e < 0.0] = 0.0
+        try:
+            p_c = (np.abs(np.emath.power((s_e ** (1.0/self.m) - 1.0),
+                                          (1.0 / self.n)))
+                   / self.alpha)
+        except FloatingPointError:
+            p_c = self.implicit_capillary_pressure(
+                saturation,
+                capillary_pressure_prev=capillary_pressure_prev,
+                wetting=wetting)
         return p_c
 
-    def calc_saturation(self, capillary_pressure, saturation_prev=None,
+    def calc_saturation(self, capillary_pressure,
+                        wetting=True,
+                        saturation_prev=None,
                         **kwargs):
-        capillary_pressure = np.copy(capillary_pressure)
-        # min_pressure = self.calc_capillary_pressure(self.s_min)
-        # max_pressure = self.calc_capillary_pressure(1.0)
+        # capillary_pressure = np.copy(capillary_pressure)
+        # # min_pressure = self.calc_capillary_pressure(self.s_min)
+        # # max_pressure = self.calc_capillary_pressure(1.0)
+        # #
+        # # capillary_pressure[capillary_pressure < min_pressure] = min_pressure
+        # # capillary_pressure[capillary_pressure > max_pressure] = max_pressure
         #
-        # capillary_pressure[capillary_pressure < min_pressure] = min_pressure
-        # capillary_pressure[capillary_pressure > max_pressure] = max_pressure
-
-        def root_capillary_pressure(sat):
-            return capillary_pressure - self.calc_capillary_pressure(sat)
-        if saturation_prev is not None:
-            s_in = saturation_prev
+        # def root_capillary_pressure(sat):
+        #     return capillary_pressure - self.calc_capillary_pressure(sat)
+        # if saturation_prev is not None:
+        #     s_in = saturation_prev
+        # else:
+        #     s_in = np.zeros(np.asarray(capillary_pressure).shape) + self.s_min
+        # solution = optimize.newton(root_capillary_pressure, s_in)
+        # saturation = solution
+        try:
+            s_e = (1.0 + np.abs(np.emath.power(self.alpha * capillary_pressure,
+                                               self.n)) ** self.m)
+        except FloatingPointError:
+            raise FloatingPointError
+        s_w = s_e * (1.0 - self.s_r_w - self.s_r_n) + self.s_r_w
+        if wetting:
+            saturation = s_w
         else:
-            s_in = np.zeros(np.asarray(capillary_pressure).shape) + self.s_min
-        solution = optimize.newton(root_capillary_pressure, s_in)
-        saturation = solution
+            saturation = 1.0 - s_w
         return saturation
