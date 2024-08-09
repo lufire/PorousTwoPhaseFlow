@@ -493,7 +493,7 @@ class VanGenuchtenModel(SaturationModel):
         s_w[s_w < self.s_r_w] = self.s_r_w
         s_w_max = 1.0 - self.s_r_n
         s_w[s_w > s_w_max] = s_w_max
-        s_e = (s_w - self.s_r_w) / (1.0 - self.s_r_w - self.s_r_n)
+        s_e = np.asarray((s_w - self.s_r_w) / (1.0 - self.s_r_w - self.s_r_n))
         s_e[s_e < 0.0] = 0.0
         try:
             p_c = (np.abs(np.emath.power((s_e ** (1.0/self.m) - 1.0),
