@@ -173,7 +173,7 @@
       "type": "Linear",
       "residual_wetting_saturation": 0.0,
       "residual_non-wetting_saturation": 0.0,
-      "m": 0.00001,
+      "m": 0.0001,
       "b": 0,
       "precalculate_pressure": false,
       "precalculate_gradient": false
