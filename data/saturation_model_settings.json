@@ -168,6 +168,15 @@
       "n": 0.11,
       "precalculate_pressure": false,
       "precalculate_gradient": false
+    },
+    "Linear": {
+      "type": "Linear",
+      "residual_wetting_saturation": 0.0,
+      "residual_non-wetting_saturation": 0.0,
+      "m": 0.00001,
+      "b": 0,
+      "precalculate_pressure": false,
+      "precalculate_gradient": false
     }
   }
 }
