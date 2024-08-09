@@ -477,14 +477,17 @@ class VanGenuchtenModel(SaturationModel):
     def __init__(self, model_dict, porous_layer, fluid=None):
         self.s_r_n = model_dict.get('residual_non-wetting_saturation', 1.0)
         self.s_r_w = model_dict.get('residual_wetting_saturation', 0.0)
+        self.wetting = model_dict.get('wetting', False)
         self.alpha = model_dict['alpha']
         self.m = model_dict['m']
         self.n = model_dict['n']
         # self.gamma = model_dict['gamma']
         super().__init__(model_dict, porous_layer, fluid=fluid)
 
-    def calc_capillary_pressure(self, saturation, wetting=True,
+    def calc_capillary_pressure(self, saturation, wetting=None,
                                 capillary_pressure_prev=None, *args, **kwargs):
+        if wetting is None:
+            wetting = self.wetting
         if wetting:
             s_w = np.copy(saturation)
         else:
@@ -506,8 +509,7 @@ class VanGenuchtenModel(SaturationModel):
                 wetting=wetting)
         return p_c
 
-    def calc_saturation(self, capillary_pressure,
-                        wetting=True,
+    def calc_saturation(self, capillary_pressure, wetting=None,
                         saturation_prev=None,
                         **kwargs):
         # capillary_pressure = np.copy(capillary_pressure)
@@ -531,6 +533,8 @@ class VanGenuchtenModel(SaturationModel):
         except FloatingPointError:
             raise FloatingPointError
         s_w = s_e * (1.0 - self.s_r_w - self.s_r_n) + self.s_r_w
+        if wetting is None:
+            wetting = self.wetting
         if wetting:
             saturation = s_w
         else:
