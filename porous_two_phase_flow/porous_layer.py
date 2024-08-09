@@ -110,4 +110,8 @@ class CarbonPaper(PorousTwoPhaseLayer):
         interfacial_area = (a1 * (p_c_max - p_c) * (1.0 - s_w)
                             + a2 * (p_c_max - p_c) ** 2.0 * (1.0 - s_w)
                             + a3 * (p_c_max - p_c) * (1.0 - s_w) ** 2.0)
+        if 'a_vol_max' in kwargs:
+            a_vol_max = kwargs.get('a_vol_max', 265.0)
+            # a_vol_max = 265.0
+            interfacial_area = a_vol_max * np.pi * (saturation * s_w ** 2.0) ** 0.6
         return interfacial_area
