@@ -355,7 +355,7 @@ class GostickCorrelation(SaturationModel):
 
         precalc_capillary_pressure = super().calc_capillary_pressure(saturation)
         if precalc_capillary_pressure is not None:
-            return precalc_capillary_pressure
+            return precalc_capillary_pressure.reshape(shape, order='F')
 
         def root_saturation(capillary_pressure):
             return saturation - \
